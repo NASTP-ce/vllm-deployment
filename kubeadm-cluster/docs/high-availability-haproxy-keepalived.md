@@ -17,28 +17,78 @@ This guide describes how to provision a highly available Kubernetes control plan
    sudo apt install haproxy keepalived -y
    ```
 
-Backup the default config (in case you need it later):
+1. **Backup the default HAProxy config (recommended):**
 
-sudo cp /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg.bak
+    ```bash
+    sudo cp /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg.bak
+    ```
 
-sudo nano /etc/haproxy/haproxy.cfg
+1. **Clear the default HAProxy config:**
 
-2. **Configure HAProxy** to forward traffic to all control plane nodes' API servers (port 6443):
-   Example `/etc/haproxy/haproxy.cfg`:
+    ```bash
+    echo "1" | sudo tee /etc/haproxy/haproxy.cfg
+
+    ```
+
+1. **Edit the HAProxy config:**
+
+    ```bash
+    sudo nano /etc/haproxy/haproxy.cfg
+    ```
+
+2. **add the following data in it:**
+
+   ```bash
+    # ========== Global settings ==========
+    global
+        log /dev/log local0              # Log to syslog facility local0
+        log /dev/log local1 notice       # Log to syslog facility local1 with notice level
+        maxconn 2000                     # Maximum number of concurrent connections
+        user haproxy                     # Run as haproxy user
+        group haproxy                    # Run as haproxy group
+        daemon                           # Run HAProxy as a daemon
+
+    # ========== Default settings ==========
+    defaults
+        log     global                   # Inherit logging from global
+        mode    tcp                      # Kubernetes API server uses raw TCP (not HTTP)
+        option  tcplog                   # Enable detailed TCP logging
+        option  dontlognull              # Don’t log connections with no data
+        timeout connect 5s               # Wait max 5s for a backend to accept connection
+        timeout client  30s              # Idle client connections closed after 30s
+        timeout server  30s              # Idle server connections closed after 30s
+
+    # ========== Frontend (listener) ==========
+    frontend k8s-api
+        bind *:6443                      # Listen on all interfaces, port 6443
+        default_backend k8s-masters      # Forward all traffic to backend pool
+
+    # ========== Backend (pool of control planes) ==========
+    backend k8s-masters
+        mode tcp                         # TCP mode for raw API server connections
+        balance roundrobin               # Distribute requests evenly across servers
+        option tcp-check                 # Perform TCP-level health checks
+        timeout connect 5s               # Backend connect timeout
+        timeout server 30s               # Backend idle timeout
+        timeout check  5s                # Health check timeout
+
+        # Control Plane nodes (API servers on port 6443)
+        # fall 3 → mark server as DOWN after 3 failed checks
+        # rise 2 → mark server as UP after 2 successful checks
+        server cp1 192.168.1.9:6443 check fall 3 rise 2
+        server cp2 192.168.1.3:6443 check fall 3 rise 2
+        server cp3 192.168.1.8:6443 check fall 3 rise 2
+
+
    ```
-   frontend k8s-api
-       bind *:6443
-       default_backend k8s-masters
 
-   backend k8s-masters
-       balance roundrobin
-       server cp1 192.168.1.9:6443 check
-       server cp2 192.168.1.3:6443 check
-       server cp3 192.168.1.8:6443 check
-   ```
+**Restart haproxy**
 
+```bash
+sudo systemctl restart haproxy 
+```
 
-**short Keepalived config example** for your 3 control-plane nodes:
+## **Keepalived config** for your 3 control-plane nodes:
 
 ---
 
@@ -49,7 +99,7 @@ sudo nano /etc/haproxy/haproxy.cfg
 ```conf
 vrrp_instance VI_1 {
     state MASTER
-    interface <your_network_interface>
+    interface eno1
     virtual_router_id 51
     priority 101
     advert_int 1
@@ -68,7 +118,7 @@ vrrp_instance VI_1 {
 ```conf
 vrrp_instance VI_1 {
     state BACKUP
-    interface <your_network_interface>
+    interface enp0s31f6
     virtual_router_id 51
     priority 100
     advert_int 1
@@ -87,7 +137,7 @@ vrrp_instance VI_1 {
 ```conf
 vrrp_instance VI_1 {
     state BACKUP
-    interface <your_network_interface>
+    interface eno1
     virtual_router_id 51
     priority 99
     advert_int 1
@@ -103,13 +153,91 @@ vrrp_instance VI_1 {
 
 ---
 
-✅ Replace `<your_network_interface>` with your NIC (e.g., `eth0`, `ens33`).
+✅ Replace `<your_network_interface>` with your NIC (e.g., `eno1` `eth0`, `enp0s31f6` , `ens33`).
 ✅ Restart Keepalived on all nodes, the VIP `192.168.1.100` should float between them.
+
 
 ---
 
-👉 Do you also want me to compress your **HAProxy + Keepalived setup** into one short, ready-to-use config snippet for `/etc/haproxy/haproxy.cfg` and `/etc/keepalived/keepalived.conf` together?
+### ✅ Checking if Keepalived is working
 
+1. **Check VIP on MASTER**
+
+   ```bash
+   ip addr show <interface> | grep 192.168.1.100
+   # or simply
+   ip a | grep eno1
+   ```
+
+   ✅ You should see `192.168.1.100` bound to the MASTER node.
+
+2. **Test failover**
+   On MASTER:
+
+   ```bash
+   sudo systemctl stop keepalived
+   ```
+
+   Then on a BACKUP node:
+
+   ```bash
+   ip a | grep eno1
+   ```
+
+   ✅ The VIP `192.168.1.100` should appear on the BACKUP node.
+
+3. **Restore MASTER**
+
+   ```bash
+   sudo systemctl start keepalived
+   ```
+
+   ✅ The VIP should float back to the MASTER.
+
+---
+
+### ✅ Checking if HAProxy is working
+
+1. **Test API health via VIP**
+
+   ```bash
+   curl -k https://192.168.1.100:6443/healthz
+   ```
+
+   ✅ Expected output:
+
+   ```
+   ok
+   ```
+
+2. **Check HAProxy logs** (shows connections forwarded):
+
+   ```bash
+   sudo tail -f /var/log/haproxy.log
+   ```
+
+   or check system journal:
+
+   ```bash
+   journalctl -u haproxy -f
+   ```
+
+3. **Simulate node failure**
+   Stop kubelet on one control-plane node (simulating API server down):
+
+   ```bash
+   sudo systemctl stop kubelet
+   ```
+
+   Then run again:
+
+   ```bash
+   curl -k https://192.168.1.100:6443/healthz
+   ```
+
+   ✅ It should still return `ok` because HAProxy routes to healthy control-plane nodes.
+
+---
 
 4. **Restart services**:
    ```bash

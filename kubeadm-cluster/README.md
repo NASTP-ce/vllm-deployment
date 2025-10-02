@@ -1,6 +1,7 @@
 
 -----
 
+
 # On-Premises Kubernetes Cluster with Kubeadm and Ansible
 
 This guide provides a comprehensive approach to deploying a high-availability (HA) Kubernetes cluster on a 9-node on-premises environment. The deployment is automated using Ansible and initialized with `kubeadm`, featuring a hybrid control plane configuration.
@@ -21,6 +22,24 @@ The cluster is designed for resilience and efficient resource utilization with t
   * **Initialization**: The cluster is bootstrapped using a `kubeadm-config.yaml` file to ensure a consistent and declarative setup.
 
 ## Prerequisites
+
+Before starting, verify and update your configuration files as needed:
+
+- **kubeadm-config.yaml**: Ensure the Kubernetes version and Flannel pod network settings are correct for your environment.
+  - For Flannel, set `podSubnet: "10.244.0.0/16"` in your config.
+  - For Kubernetes version, check the latest release at: [https://kubernetes.io/releases/](https://kubernetes.io/releases/)
+
+Update these files if required before running the cluster initialization steps.
+
+---
+
+### Add it to /etc/hosts. For example:
+
+```bash
+echo "192.168.1.9  control-plane-1" | sudo tee -a /etc/hosts
+```
+
+---
 
 Before you begin, ensure the following requirements are met:
 
@@ -45,24 +64,61 @@ This includes details on:
 
 For reference or manual setup, the following steps outline the process performed by the automation scripts.
 
-1.  **Prepare All Nodes**
+**Prepare All Nodes**
 
       * Disable swap.
       * Install container runtime (e.g., `containerd`).
       * Install Kubernetes packages: `kubeadm`, `kubelet`, and `kubectl`.
 
-verifiy the configurations file change or update if required like flannel things, kubernetes version :
+---
 
-kubeadm-config.yaml
+## Spinning up Cluster
 
-check the latest verstion from https://kubernetes.io/releases/
+### Sandbox Image Note (change it with ansible for all nodes)
 
-2.  **Initialize the First Control Plane Node**
+Kubeadm expects the CRI sandbox image `registry.k8s.io/pause:3.9`, but some runtimes (e.g., containerd) may default to `pause:3.8`. To avoid warnings during cluster initialization, update your container runtime configuration.
 
-      * On `192.168.1.9`, run the initialization command using the declarative configuration file.
-        ```bash
-        sudo kubeadm init --config=kubeadm-config.yaml
-        ```
+For **containerd**, edit `/etc/containerd/config.toml` and set:
+
+```toml
+sandbox_image = "registry.k8s.io/pause:3.9"
+```
+
+Then restart containerd:
+
+```bash
+sudo systemctl restart containerd
+```
+
+---
+
+
+1. **Stop HAProxy Temporarily**
+
+   Stop the HAProxy service so that port **6443** is free for the cluster initialization (recommended).
+
+   ```bash
+   sudo systemctl stop haproxy
+   ```
+
+2. **Initialize the First Control Plane Node**
+
+   On node `192.168.1.9`, run the initialization using the declarative configuration file:
+
+   ```bash
+   sudo kubeadm init --config=kubeadm-config.yaml
+   ```
+
+3. **Restart HAProxy**
+
+   After the initialization completes, start the HAProxy service again:
+
+   ```bash
+   sudo systemctl start haproxy
+   ```
+
+---
+
 
 3.  **Configure `kubectl`**
 

@@ -63,3 +63,15 @@
     name: containerd
     state: restarted
     enabled: yes
+
+- name: Ensure containerd uses pause:3.9
+  ansible.builtin.replace:
+    path: /etc/containerd/config.toml
+    regexp: 'sandbox_image\s*=\s*".*"'
+    replace: 'sandbox_image = "registry.k8s.io/pause:3.9"'
+
+- name: Restart containerd
+  ansible.builtin.systemd:
+    name: containerd
+    state: restarted
+    enabled: yes
