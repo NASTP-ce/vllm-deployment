@@ -1,73 +1,147 @@
 
+-----
 
-# Kubernetes Kubeadm Cluster Deployment (On-Prem, Hybrid Control Plane)
+# On-Premises Kubernetes Cluster with Kubeadm and Ansible
 
-This guide describes how to deploy a Kubernetes cluster on 9 on-prem systems (IP range: 192.168.1.1 - 192.168.1.9) using Ansible and kubeadm, with Flannel as the CNI. Cluster initialization uses a kubeadm YAML config file. The control plane consists of 192.168.1.9, 192.168.1.3, and 192.168.1.8. The nodes 192.168.1.3 and 192.168.1.8 act as both control plane and worker nodes.
+This guide provides a comprehensive approach to deploying a high-availability (HA) Kubernetes cluster on a 9-node on-premises environment. The deployment is automated using Ansible and initialized with `kubeadm`, featuring a hybrid control plane configuration.
 
+## Cluster Architecture
 
-## Overview
+The cluster is designed for resilience and efficient resource utilization with the following architecture:
 
-This repository provides a standardized approach for deploying a Kubernetes cluster on-premises using kubeadm and Ansible automation.
+  * **Total Nodes**: 9 Linux systems (Ubuntu recommended).
+  * **IP Range**: `192.168.1.1` - `192.168.1.9`.
+  * **Control Plane**: A 3-node HA control plane is established on the following nodes:
+      * `192.168.1.9` (dedicated control plane)
+      * `192.168.1.3` (hybrid: control plane + worker)
+      * `192.168.1.8` (hybrid: control plane + worker)
+  * **High Availability**: A virtual IP (`192.168.1.100`) managed by HAProxy and Keepalived acts as a stable endpoint for the Kubernetes API server.
+  **For complete instructions on High Availability, please refer to [docs/high-availability-haproxy-keepalived.md](docs/high-availability-haproxy-keepalived.md)**
+  * **Networking**: Flannel is used as the Container Network Interface (CNI) for cluster networking.
+  * **Initialization**: The cluster is bootstrapped using a `kubeadm-config.yaml` file to ensure a consistent and declarative setup.
 
-### Architecture
-- 9 Linux machines (recommended: Ubuntu)
-- Control plane nodes: 192.168.1.9, 192.168.1.3, 192.168.1.8 (hybrid nodes)
-- Virtual IP for HA: 192.168.1.100 (managed by HAProxy/Keepalived)
-- Flannel CNI for networking
+## Prerequisites
 
-### Prerequisites
-- Passwordless SSH access from your Ansible control node
-- Ansible installed on your control node
+Before you begin, ensure the following requirements are met:
 
-### Usage
-- All inventory, configuration, and automation details are managed in the [ansible/README_Ansible.md](ansible/README_Ansible.md) file.
-- Refer to the Ansible README for:
-  - Inventory and host group setup
-  - Playbook usage and orchestration
-  - Example configuration files (including kubeadm YAML)
-  - Directory structure and automation best practices
+  * **Ansible Control Node**: A machine with Ansible installed.
+  * **Passwordless SSH**: Configure passwordless SSH access from the Ansible control node to all 9 cluster nodes.
+  * **Node Preparation**: All cluster nodes must have swap disabled.
+
+## Automated Deployment (Recommended)
+
+This repository is designed for automation. All inventory, configuration variables, and playbooks are managed within the `ansible/` directory.
+
+**For complete instructions on automated deployment, please refer to [ansible/README_Ansible.md](ansible/README_Ansible.md)**
+
+This includes details on:
+
+  * Setting up the Ansible inventory and host groups.
+  * Customizing cluster configuration variables.
+  * Executing the deployment playbooks.
+  * Directory structure and automation best practices.
+
+## Manual Deployment Steps
+
+For reference or manual setup, the following steps outline the process performed by the automation scripts.
+
+1.  **Prepare All Nodes**
+
+      * Disable swap.
+      * Install container runtime (e.g., `containerd`).
+      * Install Kubernetes packages: `kubeadm`, `kubelet`, and `kubectl`.
+
+verifiy the configurations file change or update if required like flannel things, kubernetes version :
+
+kubeadm-config.yaml
+
+check the latest verstion from https://kubernetes.io/releases/
+
+2.  **Initialize the First Control Plane Node**
+
+      * On `192.168.1.9`, run the initialization command using the declarative configuration file.
+        ```bash
+        sudo kubeadm init --config=kubeadm-config.yaml
+        ```
+
+3.  **Configure `kubectl`**
+
+      * To manage the cluster from the control plane node, copy the admin configuration:
+        ```bash
+        mkdir -p $HOME/.kube
+        sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+        sudo chown $(id -u):$(id -g) $HOME/.kube/config
+        ```
+
+4.  **Install the CNI Plugin**
+
+      * Deploy Flannel to enable pod-to-pod communication:
+        ```bash
+        kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+        ```
+
+5.  **Join Additional Nodes**
+
+      * **Control Plane Nodes**: Use the `kubeadm join` command provided in the output of the `init` step (with the `--control-plane` flag) to join `192.168.1.3` and `192.168.1.8`.
+      * **Worker Nodes**: Use the standard `kubeadm join` command to add the remaining worker nodes to the cluster.
+
 
 ---
 
+### 📝 (Optional) Removing Control-Plane Taints (Hybrid Setup)
 
-## Steps
+By default, Kubernetes taints all control-plane nodes with:
 
-1. **Prepare all nodes** (disable swap, install dependencies)
-2. **Install containerd** (or Docker)
-3. **Install kubeadm, kubelet, kubectl**
-4. **Initialize the first control plane node (192.168.1.9)**:
-  ```bash
-  kubeadm init --config=kubeadm-config.yaml
-  ```
-5. **Copy kubeconfig to your user**:
-  ```bash
-  mkdir -p $HOME/.kube
-  sudo cp /etc/kubernetes/admin.conf $HOME/.kube/config
-  sudo chown $(id -u):$(id -g) $HOME/.kube/config
-  ```
-6. **Install Flannel CNI**:
-  ```bash
-  kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
-  ```
-7. **Join additional control plane nodes (192.168.1.3, 192.168.1.8)** using the `kubeadm join ... --control-plane` command from the init output.
-8. **Join worker nodes** (including hybrid nodes) using the standard join command.
+```bash
+node-role.kubernetes.io/control-plane:NoSchedule
+```
 
+This prevents workloads from being scheduled on control-plane nodes.
+Since we are running a **hybrid control-plane + worker setup**, we must remove these taints.
 
+Run the following commands after initializing the cluster and joining all control-plane nodes:
 
-## Using Ansible
+```bash
+# Remove taint from control-plane-1
+kubectl taint nodes control-plane-1 node-role.kubernetes.io/control-plane:NoSchedule-
 
-- See [ansible/README_Ansible.md](ansible/README_Ansible.md) for all automation and configuration details.
+# Remove taint from control-plane-2
+kubectl taint nodes control-plane-2 node-role.kubernetes.io/control-plane:NoSchedule-
+
+# Remove taint from control-plane-3
+kubectl taint nodes control-plane-3 node-role.kubernetes.io/control-plane:NoSchedule-
+```
 
 ---
 
+✅ **Verification:**
+After running the commands, check that no taints remain:
 
+```bash
+kubectl describe node control-plane-1 | grep Taints
+kubectl describe node control-plane-2 | grep Taints
+kubectl describe node control-plane-3 | grep Taints
+```
 
-## Notes
+Output should be:
 
-- This setup uses Flannel for networking.
-- 192.168.1.3 and 192.168.1.8 act as both control plane and worker nodes.
-- High availability is provided via HAProxy and Keepalived (see [docs/high-availability-haproxy-keepalived.md](docs/high-availability-haproxy-keepalived.md)).
-- For troubleshooting and advanced configuration, see other markdown files in this directory.
+```bash
+Taints:     <none>
+```
 
 ---
 
+💡 **Tip (memorization):** Think of the taint as a **“No-Entry 🚫 sign”**. Running `kubectl taint … -` is like **erasing the sign**, allowing pods to enter and run on your control-plane nodes.
+
+---
+
+👉 Do you also want me to give you a **one-liner command** that removes the taint from *all control-plane nodes at once*, instead of listing them one by one?
+
+
+-----
+
+### Additional Information
+
+  * **Hybrid Nodes**: The nodes `192.168.1.3` and `192.168.1.8` are configured to run workloads alongside control plane components.
+  * **HA Configuration**: For a detailed explanation of the HAProxy and Keepalived setup, see the document in `docs/high-availability-haproxy-keepalived.md`.
+  * **Troubleshooting**: Refer to other markdown files in this repository for advanced configuration and troubleshooting tips.
