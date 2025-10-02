@@ -21,36 +21,30 @@ echo 'eval "$(register-python-argcomplete ansible)"' >> ~/.bashrc
 
 ---
 
-## 2. 📂 Directory Structure (Complete Example)
+
+## 2. 📂 Directory Structure (Actual)
 
 ```
-ansible-project/
-├── ansible.cfg              # Global Ansible configuration
+ansible/
+├── README_Ansible.md
+├── ansible.cfg
 ├── inventories/
-│   ├── production/
-│   │   └── hosts.ini        # Host inventory (server/client groups)
-│   ├── staging/
-│   │   └── hosts.ini
+│   ├── production.ini
+│   └── staging.ini
 ├── playbooks/
-│   ├── site.yml             # Main entry playbook (calls roles)
-│   ├── disable-swap.yml     # Playbook to disable swap
-│   └── enable-swap.yml      # Rollback playbook to re-enable swap
+│   ├── disable-swap.yml
+│   ├── install-containerd.yml
+│   ├── install-kubeadm.yml
 ├── roles/
-│   ├── disable_swap/        # Role to disable swap
-│   │   ├── tasks/main.yml
-│   │   ├── defaults/main.yml
-│   │   ├── handlers/main.yml
-│   │   ├── meta/main.yml
-│   │   └── README.md
-│   ├── nfs_server/          # Example: configure NFS server
-│   │   └── tasks/main.yml
-│   ├── nfs_client/          # Example: configure NFS clients
-│   │   └── tasks/main.yml
-│   └── <future_roles>/      # e.g., docker, prometheus, grafana
-├── tests/
-│   └── molecule/            # Molecule test scenarios
-└── .github/workflows/
-    └── ansible-ci.yml       # CI pipeline (lint, test, deploy)
+│   ├── containerd/
+│   │   └── tasks/
+│   │       └── main.yml
+│   ├── disable_swap/
+│   │   └── tasks/
+│   │       └── main.yml
+│   ├── kubeadm/
+│   │   └── tasks/
+│   │       └── main.yml
 ```
 
 ---
@@ -74,13 +68,7 @@ ansible-project/
 ansible all -m ping
 ```
 
-### 2. Run main site playbook
-
-```bash
-ansible-playbook playbooks/site.yml
-```
-
-### 3. Run playbook for specific host group
+### 3. Run playbook to disable swap
 
 ```bash
 ansible-playbook playbooks/disable-swap.yml
@@ -90,13 +78,19 @@ ansible-playbook playbooks/disable-swap.yml
 
 ```bash
 ansible all -a "uptime"
-ansible ubuntu_nodes -a "df -h"
+ansible all -a "df -h"
 ```
 
-### 5. Run a role/playbook with tags
+### 5. Run a playbook to disable Install Containerd
 
 ```bash
-ansible-playbook playbooks/site.yml --tags "swap"
+ansible-playbook playbooks/install-containerd.yml
+```
+
+### 5. Run a playbook to disable Install Kubeadm, Kubelet and Kubectl
+
+```bash
+ansible-playbook playbooks/install-kubeadm.yml
 ```
 
 ---
