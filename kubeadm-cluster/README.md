@@ -100,6 +100,12 @@ For reference or manual setup, the following steps outline the process performed
    sudo systemctl stop haproxy
    ```
 
+2. **Validate CRI:**
+
+   ```bash
+   crictl --runtime-endpoint unix:///var/run/containerd/containerd.sock version   
+   ```
+   
 2. **Initialize the First Control Plane Node**
 
    On node `192.168.1.9`, run the initialization using the declarative configuration file:
