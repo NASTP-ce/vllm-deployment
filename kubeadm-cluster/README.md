@@ -76,22 +76,21 @@ For reference or manual setup, the following steps outline the process performed
 
 ### Sandbox Image Note (change it with ansible for all nodes)
 
-Kubeadm expects the CRI sandbox image `registry.k8s.io/pause:3.9`, but some runtimes (e.g., containerd) may default to `pause:3.8`. To avoid warnings during cluster initialization, update your container runtime configuration.
+  Kubeadm expects the CRI sandbox image `registry.k8s.io/pause:3.9`, but some runtimes (e.g., containerd) may default to `pause:3.8`. To avoid warnings during cluster initialization, update your container runtime configuration.
 
-For **containerd**, edit `/etc/containerd/config.toml` and set:
+  For **containerd**, edit `/etc/containerd/config.toml` and set:
 
-```toml
-sandbox_image = "registry.k8s.io/pause:3.9"
-```
+  ```toml
+  sandbox_image = "registry.k8s.io/pause:3.9"
+  ```
 
-Then restart containerd:
+  Then restart containerd:
 
-```bash
-sudo systemctl restart containerd
-```
+  ```bash
+  sudo systemctl restart containerd
+  ```
 
 ---
-
 
 1. **Stop HAProxy Temporarily**
 
@@ -108,6 +107,18 @@ sudo systemctl restart containerd
    ```bash
    sudo kubeadm init --config=kubeadm-config.yaml
    ```
+
+
+2. **If You Encounter Errors During Initialization**
+
+  - Troubleshoot and resolve any reported errors.
+  - If needed, reset kubeadm and retry the initialization:
+
+    ```bash
+    sudo kubeadm reset -f
+    ```
+
+  - For a detailed reset procedure, see: [docs/reset_master_node_new.md](docs/reset_master_node_new.md)
 
 3. **Restart HAProxy**
 

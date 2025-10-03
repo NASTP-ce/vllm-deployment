@@ -1,0 +1,7 @@
+- name: Power off Systems
+  gather_facts: no # No need to gather facts for this playbook because we are just powering off
+  hosts: clients # all, clients, jahangir or hassan
+  become: yes
+  tasks:
+    - name: Shut down the system
+      ansible.builtin.command: shutdown -h now
