@@ -19,7 +19,7 @@ import os
 SERVER_HOST = "192.168.1.1"
 SERVER_PORT = "8000"
 BASE_URL = f"http://{SERVER_HOST}:{SERVER_PORT}"
-MODEL_ID = "/mnt/data/office_work/vllms_inference/Llama-3.2-3B-Instruct"
+MODEL_ID = "/mnt/data/office_work/vllms_inference/3.1-8b-instruct"
 
 TEST_MESSAGES = [
     "What is artificial intelligence?",
