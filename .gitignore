@@ -1,0 +1,38 @@
+# General
+*.log
+*.tmp
+*.swp
+*.bak
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.env
+venv/
+.env
+
+# Ansible
+ansible/.retry
+ansible/inventories/*.retry
+
+# Kubernetes
+*.tar
+*.crt
+*.key
+*.conf
+*.kubeconfig
+kubeadm-cluster/join.txt
+kubeadm-cluster/kubernetes-pki*.tar
+
+# VSCode
+.vscode/
+
+# System
+Thumbs.db
+
+# Ignore sensitive and generated files
+kubeadm-cluster/kubeadm-config.yaml
+kubeadm-cluster/ansible/inventories/production.ini
+kubeadm-cluster/ansible/inventories/staging.ini
