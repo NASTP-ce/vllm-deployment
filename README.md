@@ -9,7 +9,7 @@ This project sets up **vLLM inference** using the **Llama 3.2 3B Instruct** mode
 First, create and activate a **Conda environment**:
 
 ```bash
-conda create -n vllm-env python=3.9 -y
+conda create -n vllm-env python=3.11 -y
 conda activate vllm-env
 ```
 
@@ -70,7 +70,7 @@ http://127.0.0.1:8000/v1
 1. Copy the chatbot file to the Nginx web root:
 
    ```bash
-   sudo cp /mnt/data/office_work/vllms_inference/chatbot.html /var/www/html/
+   sudo cp /mnt/data/office_work/vllms_inference/ngix.config /etc/nginx/sites-available/chatbot
    ```
 
 2. Enable and restart Nginx:
@@ -83,7 +83,13 @@ http://127.0.0.1:8000/v1
 3. Open in your browser:
 
    ```
-   http://localhost/chatbot.html
+   http://localhost
+   ```
+
+   or
+
+   ```
+   http://192.168.1.1 // replace it with the IP address of the system
    ```
 
 ---
