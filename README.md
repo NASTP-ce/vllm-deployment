@@ -104,3 +104,15 @@ http://127.0.0.1:8000/v1
 * Use `--host 0.0.0.0` with vLLM to make it accessible from other machines.
 
 ---
+
+
+
+
+old config:
+
+python -m vllm.entrypoints.openai.api_server   --model /mnt/data/office_work/vllms_inference/Llama-3.2-3B-Instruct   --max-num-batched-tokens 4096   --gpu-memory-utilization 0.9
+
+python3 -m http.server 8080
+
+
+ python3 distributed_load_test.py --node-id 1 --users 12
