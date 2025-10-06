@@ -1,6 +1,26 @@
 # 🧠 vLLM Deployment
 
-This repository contains a setup for running **vLLM inference** using **Llama llama3_8b** model and serving a simple **chatbot frontend**.
+This project sets up **vLLM inference** using the **Llama 3.2 3B Instruct** model and serves a simple **chatbot frontend** via **Nginx**.
+
+---
+
+## ⚙️ Setup and Environment
+
+First, create and activate a **Conda environment**:
+
+```bash
+conda create -n vllm-env python=3.9 -y
+conda activate vllm-env
+```
+
+Then install the required dependencies:
+
+```bash
+pip install vllm
+sudo apt install nginx -y
+```
+
+(Optional) Use a **GPU with CUDA** for faster inference.
 
 ---
 
@@ -16,40 +36,19 @@ vllm-deployment/
 
 ---
 
-## 🚀 Overview
-
-The setup includes two main components:
+## 🚀 Components
 
 1. **vLLM Inference Server**
-   Runs an OpenAI-compatible API server using the `vLLM` engine for optimized LLM inference.
+   Runs an OpenAI-compatible API server using `vLLM` for optimized model inference.
 
 2. **Frontend Chatbot**
-   A simple HTML chatbot interface (`chatbot.html`) served by **Nginx** and connected to the vLLM backend API.
+   A simple HTML-based chatbot (`chatbot.html`) served by **Nginx**, connected to the vLLM API.
 
 ---
 
-## 🧩 Requirements
+## 🧩 Run the vLLM Inference Server
 
-Make sure you have the following installed:
-
-* **Python 3.9+**
-* **vLLM**
-
-  ```bash
-  pip install vllm
-  ```
-* **Nginx**
-
-  ```bash
-  sudo apt install nginx -y
-  ```
-* (Optional) **GPU** with CUDA for faster inference.
-
----
-
-## ⚙️ Run the vLLM Inference Server
-
-Start the vLLM OpenAI-compatible API server with your model:
+Start the API server:
 
 ```bash
 python -m vllm.entrypoints.openai.api_server \
@@ -58,7 +57,7 @@ python -m vllm.entrypoints.openai.api_server \
   --gpu-memory-utilization 0.9
 ```
 
-This will start the inference API at:
+The API will be available at:
 
 ```
 http://127.0.0.1:8000/v1
@@ -66,22 +65,22 @@ http://127.0.0.1:8000/v1
 
 ---
 
-## 🌐 Serve Chatbot Frontend via Nginx
+## 🌐 Serve Chatbot via Nginx
 
-1. Copy your chatbot file to the Nginx web root:
+1. Copy the chatbot file to the Nginx web root:
 
    ```bash
    sudo cp /mnt/data/office_work/vllms_inference/chatbot.html /var/www/html/
    ```
 
-2. Start or restart Nginx:
+2. Enable and restart Nginx:
 
    ```bash
    sudo systemctl enable nginx
    sudo systemctl restart nginx
    ```
 
-3. Access the chatbot at:
+3. Open in your browser:
 
    ```
    http://localhost/chatbot.html
@@ -91,16 +90,16 @@ http://127.0.0.1:8000/v1
 
 ## 🧠 How It Works
 
-* The **chatbot frontend (HTML)** sends requests to the local **vLLM API endpoint**.
-* **vLLM** processes the prompt using the **Llama 3.2 3B Instruct** model.
-* The response is displayed back in the chat interface.
+* The **chatbot frontend** sends user input to the local **vLLM API**.
+* **vLLM** processes the request using the **Llama 3.2 3B Instruct** model.
+* The model’s response is shown back in the chat interface.
 
 ---
 
 ## 🧾 Notes
 
-* Ensure that `chatbot.html` points to the correct backend API (default: `http://localhost:8000/v1/chat/completions`).
-* You can customize the model path or parameters as needed.
-* Use `--host 0.0.0.0` with vLLM to make it accessible from other machines.
+* Make sure `chatbot.html` uses the correct backend endpoint (`http://localhost:8000/v1/chat/completions`).
+* You can adjust model paths or parameters as needed.
+* Use `--host 0.0.0.0` to allow access from other machines.
 
 ---
