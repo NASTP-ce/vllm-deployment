@@ -224,14 +224,3 @@ kubectl apply -f ingress.yaml
    ✅ You should see a JSON response like OpenAI’s API.
 
 ---
-
-## 📌 Memorization Trick
-
-Remember **N-P-D-S-I** →
-**Namespace → Pod/Deployment → Device Plugin (GPU) → Service → Ingress**
-
-This is the **standard flow for AI/ML workloads on Kubernetes**.
-
----
-
-👉 Jagz, do you want me to also add **PVC + Object Storage integration** (instead of hostPath) so this is production-ready? That way your model weights aren’t tied to one node.
