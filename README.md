@@ -70,9 +70,11 @@ Start the inference server:
 
 ```bash
 python -m vllm.entrypoints.openai.api_server \
-  --model /mnt/data/office_work/vllms_inference/Llama-3.2-3B-Instruct \
-  --max-num-batched-tokens 4096 \
-  --gpu-memory-utilization 0.9
+
+    --model /mnt/data/office_work/vllms_inference/3.1-8b-instruct \
+    --max-num-batched-tokens 4096 \
+    --gpu-memory-utilization 0.9 \
+    --max-model-len 40960 
 ```
 
 Start the inference server with small model:
@@ -99,14 +101,21 @@ http://127.0.0.1:8000/v1
 1. Copy your Nginx configuration file:
 
    ```bash
-   sudo cp /mnt/data/office_work/vllms_inference/nginx.conf /etc/nginx/sites-available/chatbot
+   sudo cp nginx.conf /etc/nginx/sites-available/chatbot
    ```
 
-2. Enable and restart Nginx:
+2. Enable and start Nginx (One time after installation):
 
    ```bash
    sudo ln -s /etc/nginx/sites-available/chatbot /etc/nginx/sites-enabled/
    sudo systemctl enable nginx
+   sudo systemctl start nginx
+   ```
+
+2. Test configuration and restart Nginx:
+
+   ```bash
+   sudo nginx -t
    sudo systemctl restart nginx
    ```
 
