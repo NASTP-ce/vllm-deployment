@@ -17,6 +17,7 @@ venv/
 .env
 
 # Model directories
+models
 Llama-3.2-3B-Instruct/
 llama3_8b/
 llama_8b/

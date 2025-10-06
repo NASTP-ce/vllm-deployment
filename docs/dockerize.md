@@ -19,18 +19,6 @@ You need to set the environment variable for your Hugging Face token so Docker c
 export HF_TOKEN="your_huggingface_token_here"
 ```
 
-### **Windows (Command Prompt):**
-
-```bash
-set HF_TOKEN="your_huggingface_token_here"
-```
-
-### **Windows (PowerShell):**
-
-```bash
-$env:HF_TOKEN="your_huggingface_token_here"
-```
-
 **Note:** Replace `"your_huggingface_token_here"` with your actual token.
 
 -----
@@ -44,11 +32,12 @@ This is the command you will execute. It pulls the **vllm/vllm-openai:latest** i
 ```bash
 docker run --runtime nvidia --gpus all \
     -v ~/.cache/huggingface:/root/.cache/huggingface \
+    -v ./models:/app/local_model \
     --env "HUGGING_FACE_HUB_TOKEN=$HF_TOKEN" \
     -p 8000:8000 \
     --ipc=host \
     vllm/vllm-openai:latest \
-    --model Qwen/Qwen3-0.6B
+    --model /app/local_model/Llama-3.2-1B
 ```
 
 ### **Explanation of Options**
