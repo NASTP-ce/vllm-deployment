@@ -13,6 +13,17 @@ __pycache__/
 venv/
 .env
 
+# Local environment files
+.env
+
+# Model directories
+Llama-3.2-3B-Instruct/
+llama3_8b/
+llama_8b/
+
+# Load test logs
+load_test_logs/
+
 # Ansible
 ansible/.retry
 ansible/inventories/*.retry
