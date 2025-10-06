@@ -50,3 +50,7 @@ kubeadm-cluster/ansible/inventories/staging.ini
 chatbot-ui/node_modules/
 chatbot-ui/.next/
 chatbot-ui/.env.local
+chatbot-ui/dist/
+chatbot-ui/out/
+chatbot-ui/*.log
+
