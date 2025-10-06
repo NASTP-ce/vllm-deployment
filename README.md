@@ -75,6 +75,15 @@ python -m vllm.entrypoints.openai.api_server \
   --gpu-memory-utilization 0.9
 ```
 
+Start the inference server with small model:
+
+```bash
+python -m vllm.entrypoints.openai.api_server \
+  --model ./models/Llama-3.2-1B \
+  --max-num-batched-tokens 4096 \
+  --gpu-memory-utilization 0.5
+```
+
 The API will be available at:
 
 ```
