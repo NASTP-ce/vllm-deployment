@@ -33,21 +33,12 @@ export HF_TOKEN="your_huggingface_token_here"
 
 ## 3. Run vLLM in Docker 🧠
 
-Run the following command to start the **vLLM OpenAI-compatible API server** using Docker **latest** image.
+Use the following command to launch the **vLLM OpenAI-compatible API server** inside Docker.
 
-```bash
-sudo docker run --gpus all \
-  -v ~/.cache/huggingface:/root/.cache/huggingface \
-  -v ./models:/app/local_model \
-  --env "HUGGING_FACE_HUB_TOKEN=$HF_TOKEN" \
-  -p 8000:8000 \
-  --ipc=host \
-  vllm/vllm-openai:latest \
-  --model /app/local_model/Llama-3.2-1B
-```
+* The Docker image **`vllm/vllm-openai:v0.8.0`** supports **CUDA 12.4**.
+* To use the latest CUDA version, switch to **`vllm/vllm-openai:latest`**.
+* Adjust **`--max-model-len`** based on your GPU’s available memory capacity.
 
-
-For 12.4 cuda version, an older image vllm/vllm-openai:v0.8.0:
 
 ```bash
 sudo docker run --gpus all \
@@ -57,7 +48,8 @@ sudo docker run --gpus all \
   -p 8000:8000 \
   --ipc=host \
   vllm/vllm-openai:v0.8.0 \
-  --model /app/local_model/Llama-3.2-1B
+  --model /app/local_model/3.1-8b-instruct \
+  --max-model-len 8192
 ```
 
 ### Explanation of Options
