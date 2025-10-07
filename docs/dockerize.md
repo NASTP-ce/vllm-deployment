@@ -33,7 +33,7 @@ export HF_TOKEN="your_huggingface_token_here"
 
 ## 3. Run vLLM in Docker 🧠
 
-Run the following command to start the **vLLM OpenAI-compatible API server** using Docker.
+Run the following command to start the **vLLM OpenAI-compatible API server** using Docker **latest** image.
 
 ```bash
 sudo docker run --gpus all \
@@ -89,15 +89,14 @@ You should see logs confirming the server is running.
 
 ## 5. Test the API
 
-Test the vLLM endpoint using `curl`:
+Test the vLLM endpoint using `curl`, change the ip addess accordingly:
 
 ```bash
-curl http://localhost:8000/v1/completions \
+curl http://192.168.1.8:8000/v1/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "Qwen/Qwen3-0.6B",
-    "prompt": "Hello, my name is",
-    "max_tokens": 10
+    "prompt": "Explain in simple terms: What is data science?",
+    "max_tokens": 150
   }'
 ```
 
@@ -118,3 +117,42 @@ sudo systemctl restart nginx
 
 ---
 
+
+### Export Docker Image
+
+**export a Docker image to a `.tar` file** using the `docker save` command.
+
+
+### 🧪 **Example 1: Save an image to a `.tar` file**
+
+```bash
+sudo docker save -o vllm.v0.8.0.tar vllm/vllm-openai:v0.8.0
+```
+
+---
+
+### 🧪 **Example 3: Compress it while saving**
+
+To make the file smaller:
+
+```bash
+docker save myapp:latest | gzip > myapp.tar.gz
+```
+
+---
+
+### 🧰 **To load it back later:**
+
+You can import it back using:
+
+```bash
+docker load -i vllm.v0.8.0.tar
+```
+
+or (for compressed version)
+
+```bash
+gunzip -c myapp.tar.gz | docker load
+```
+
+---
