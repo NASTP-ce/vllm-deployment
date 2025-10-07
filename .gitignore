@@ -57,3 +57,5 @@ chatbot-ui/dist/
 chatbot-ui/out/
 chatbot-ui/*.log
 
+# Docker related
+vllm.v0.8.0

@@ -285,11 +285,11 @@
     <div class="chat-container">
         <div class="chat-header">
             <div class="status-indicator" id="statusIndicator">Disconnected</div>
-            <h1>🤖 Distributed LLaMA Chat</h1>
+            <h1>🤖 Centaic LLM</h1>
             <div class="server-config" onclick="toggleConfig()">⚙️ Config</div>
             <div class="config-panel" id="configPanel">
                 <h3>Server Configuration</h3>
-                <input type="text" id="serverHost" placeholder="Server IP (e.g., 192.168.1.5)" value="192.168.1.1">
+                <input type="text" id="serverHost" placeholder="Server IP (e.g., 192.168.1.1)" value="192.168.1.1">
                 <input type="number" id="serverPort" placeholder="Port" value="8000">
                 <button onclick="updateConfig()">Update & Test Connection</button>
                 <button onclick="toggleConfig()">Close</button>
@@ -298,7 +298,7 @@
         
         <div class="chat-messages" id="chatMessages">
             <div class="message bot-message">
-                <div class="message-content">👋 Hello! I'm your distributed LLaMA assistant. I'm running across your networked servers. How can I help you today?</div>
+                <div class="message-content">👋 Hello! I'm your Centaic Chatbot Assistant. I'm running on vLLM. How can I help you today?</div>
                 <div class="message-time">System message</div>
             </div>
         </div>
