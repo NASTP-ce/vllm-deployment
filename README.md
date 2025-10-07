@@ -71,13 +71,13 @@ Start the inference server:
 ```bash
 python -m vllm.entrypoints.openai.api_server \
 
-    --model /mnt/data/office_work/vllms_inference/3.1-8b-instruct \
+    --model modles/3.1-8b-instruct \
     --max-num-batched-tokens 4096 \
     --gpu-memory-utilization 0.9 \
     --max-model-len 40960 
 ```
 
-Start the inference server with small model:
+Start the inference server with **small model**:
 
 ```bash
 python -m vllm.entrypoints.openai.api_server \
