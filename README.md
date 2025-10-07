@@ -96,7 +96,21 @@ http://127.0.0.1:8000/v1
 
 ---
 
-## 3. Run vLLM in Docker 🧠
+
+## 3. Run vLLM with Docker Compose 🧠
+
+Use the following command to launch the **vLLM OpenAI-compatible API server** with Docker Compose.
+
+```bash
+sudo docker compose up
+```
+
+[See Details about dockerization guide](docs/dockerize.md)
+
+---
+
+
+## 3. Run vLLM with Docker Command 🧠
 
 Use the following command to launch the **vLLM OpenAI-compatible API server** inside Docker.
 
@@ -126,7 +140,7 @@ sudo docker run --gpus all \
 Test the vLLM endpoint using `curl`, change the ip addess accordingly:
 
 ```bash
-curl http://192.168.1.8:8000/v1/completions \
+curl http://192.168.1.1:8000/v1/completions \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "Explain in simple terms: What is data science?",
