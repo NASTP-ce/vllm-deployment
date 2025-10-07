@@ -1,0 +1,6 @@
+---
+# handlers file for docker_install
+- name: Restart Docker
+  ansible.builtin.service:
+    name: docker
+    state: restarted

@@ -1,0 +1,6 @@
+---
+- name: Install Docker on Ubuntu
+  hosts: all   # all, clients, jahangir or hassan
+  become: true
+  roles:
+    - docker_install

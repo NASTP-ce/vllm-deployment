@@ -96,6 +96,50 @@ http://127.0.0.1:8000/v1
 
 ---
 
+## 3. Run vLLM in Docker 🧠
+
+Use the following command to launch the **vLLM OpenAI-compatible API server** inside Docker.
+
+* The Docker image **`vllm/vllm-openai:v0.8.0`** supports **CUDA 12.4**.
+* To use the latest CUDA version, switch to **`vllm/vllm-openai:latest`**.
+* Adjust **`--max-model-len`** based on your GPU’s available memory capacity.
+
+
+```bash
+sudo docker run --gpus all \
+  -v ~/.cache/huggingface:/root/.cache/huggingface \
+  -v ./models:/app/local_model \
+  --env "HUGGING_FACE_HUB_TOKEN=$HF_TOKEN" \
+  -p 8000:8000 \
+  --ipc=host \
+  vllm/vllm-openai:v0.8.0 \
+  --model /app/local_model/3.1-8b-instruct \
+  --max-model-len 8192
+```
+
+[See Details about dockerization guide](docs/dockerize.md)
+
+---
+
+## 5. Test the API
+
+Test the vLLM endpoint using `curl`, change the ip addess accordingly:
+
+```bash
+curl http://192.168.1.8:8000/v1/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Explain in simple terms: What is data science?",
+    "max_tokens": 150
+  }'
+```
+
+- Change the IP address accordingly.
+
+You can also use the **OpenAI Python client** by setting your `base_url` to `http://localhost:8000/v1`.
+
+---
+
 ## 🌐 Serve the Chatbot via Nginx
 
 1. Copy your Nginx configuration file:
