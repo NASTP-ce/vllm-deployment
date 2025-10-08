@@ -1,51 +1,160 @@
-
------
-
-
 # On-Premises Kubernetes Cluster with Kubeadm and Ansible
 
 This guide provides a comprehensive approach to deploying a high-availability (HA) Kubernetes cluster on a 9-node on-premises environment. The deployment is automated using Ansible and initialized with `kubeadm`, featuring a hybrid control plane configuration.
 
-## Cluster Architecture
-
-The cluster is designed for resilience and efficient resource utilization with the following architecture:
-
-  * **Total Nodes**: 9 Linux systems (Ubuntu recommended).
-  * **IP Range**: `192.168.1.1` - `192.168.1.9`.
-  * **Control Plane**: A 3-node HA control plane is established on the following nodes:
-      * `192.168.1.9` (dedicated control plane)
-      * `192.168.1.3` (hybrid: control plane + worker)
-      * `192.168.1.8` (hybrid: control plane + worker)
-  * **High Availability**: A virtual IP (`192.168.1.100`) managed by HAProxy and Keepalived acts as a stable endpoint for the Kubernetes API server.
-  **For complete instructions on High Availability, please refer to [docs/high-availability-haproxy-keepalived.md](docs/high-availability-haproxy-keepalived.md)**
-  * **Networking**: Flannel is used as the Container Network Interface (CNI) for cluster networking.
-  * **Initialization**: The cluster is bootstrapped using a `kubeadm-config.yaml` file to ensure a consistent and declarative setup.
-
-## Prerequisites
-
-Before starting, verify and update your configuration files as needed:
-
-- **kubeadm-config.yaml**: Ensure the Kubernetes version and Flannel pod network settings are correct for your environment.
-  - For Flannel, set `podSubnet: "10.244.0.0/16"` in your config.
-  - For Kubernetes version, check the latest release at: [https://kubernetes.io/releases/](https://kubernetes.io/releases/)
-
-Update these files if required before running the cluster initialization steps.
+Excellent — you’re building a complete **Kubernetes HA cluster design document**, so I’ve merged your new information into the previously polished architecture section.
+Here’s the **final, professional, documentation-ready version** — ideal for internal documentation, GitHub repos, or deployment guides.
 
 ---
 
-### Add it to /etc/hosts. For example:
+# Cluster Architecture
 
-```bash
-echo "192.168.1.9  control-plane-1" | sudo tee -a /etc/hosts
+The Kubernetes cluster is architected for **high availability (HA)**, **scalability**, and **efficient resource utilization**. The design ensures uninterrupted operation and fault tolerance through redundant load balancers, multi-node control planes, and distributed worker nodes.
+
+---
+
+## Overview
+
+* **Operating System:** Linux (Ubuntu recommended)
+* **Total Nodes:** 10
+* **IP Range:** `192.168.1.1` – `192.168.1.10`
+* **Virtual IP (VIP):** `192.168.1.100` — managed by **HAProxy** and **Keepalived** to provide a stable endpoint for the Kubernetes API server
+* **Cluster Domain (Example):** `k8s.local`
+* **Networking:** [Flannel](https://github.com/flannel-io/flannel) is used as the Container Network Interface (CNI) for cluster networking
+* **Cluster Initialization:** The cluster is bootstrapped using a `kubeadm-config.yaml` file for consistent, declarative setup
+* **HA Documentation:**
+  For complete setup and failover details, see
+  👉 [docs/high-availability-haproxy-keepalived.md](docs/high-availability-haproxy-keepalived.md)
+
+---
+
+## Load Balancer Layer
+
+Two dedicated nodes serve as HAProxy load balancers in **active–passive mode**, managed by Keepalived for automatic VIP failover.
+
+| Role            | Hostname / FQDN | IP Address     | Description                       |
+| --------------- | --------------- | -------------- | --------------------------------- |
+| Load Balancer 1 | `lb1.k8s.local` | `192.168.1.9`  | Primary HAProxy node              |
+| Load Balancer 2 | `lb2.k8s.local` | `192.168.1.10` | Secondary HAProxy node (failover) |
+
+**Virtual IP (VIP):** `192.168.1.100` — accessible via `api.k8s.local`
+
+---
+
+## Control Plane Layer
+
+Three hybrid nodes (control + worker) maintain cluster state and provide API server redundancy. Kubernetes control components (API server, etcd, scheduler, controller-manager) are distributed across these nodes.
+
+| Node            | Hostname / FQDN | IP Address    | Role                   |
+| --------------- | --------------- | ------------- | ---------------------- |
+| Control Plane 1 | `pc1.k8s.local` | `192.168.1.1` | Control Plane + Worker |
+| Control Plane 2 | `cp3.k8s.local` | `192.168.1.3` | Control Plane + Worker |
+| Control Plane 3 | `cp5.k8s.local` | `192.168.1.5` | Control Plane + Worker |
+
+---
+
+## Worker Node Layer
+
+Dedicated worker nodes handle all user workloads and deployments.
+
+| Node     | Hostname / FQDN     | IP Address    | Role   |
+| -------- | ------------------- | ------------- | ------ |
+| Worker 1 | `pc2.k8s.local` | `192.168.1.2` | Worker |
+| Worker 2 | `pc4.k8s.local` | `192.168.1.4` | Worker |
+| Worker 3 | `pc6.k8s.local` | `192.168.1.6` | Worker |
+| Worker 4 | `pc7.k8s.local` | `192.168.1.7` | Worker |
+| Worker 5 | `pc8.k8s.local` | `192.168.1.8` | Worker |
+
+---
+
+## Textual Topology Diagram
+
+```
+                    +-------------------------------------+
+                    |  Virtual IP: 192.168.1.100          |
+                    |  DNS: api.k8s.local                 |
+                    |  (HAProxy + Keepalived)             |
+                    +-------------------------------------+
+                              /              \
+                 +-------------------+   +-------------------+
+                 | lb1.k8s.local     |   | lb2.k8s.local     |
+                 | 192.168.1.9       |   | 192.168.1.10      |
+                 +-------------------+   +-------------------+
+                              |
+                 ---------------------------------
+                 |          API Traffic          |
+                 ---------------------------------
+                              |
+        +-----------------------------------------------+
+        |         Control Plane (HA, Hybrid)            |
+        | pc1.k8s.local | pc3.k8s.local | pc5.k8s.local |
+        | 192.168.1.1   | 192.168.1.3   | 192.168.1.5   |
+        +-----------------------------------------------+
+                              |
+                 ---------------------------------
+                 |          Worker Nodes         |
+                 ---------------------------------
+  pc1.k8s.local | worker2.k8s.local | worker3.k8s.local | worker4.k8s.local | worker5.k8s.local
+  192.168.1.2       | 192.168.1.4       | 192.168.1.6       | 192.168.1.7       | 192.168.1.8
 ```
 
 ---
 
-Before you begin, ensure the following requirements are met:
+# Prerequisites
 
-  * **Ansible Control Node**: A machine with Ansible installed.
-  * **Passwordless SSH**: Configure passwordless SSH access from the Ansible control node to all 9 cluster nodes.
-  * **Node Preparation**: All cluster nodes must have swap disabled.
+Before starting the deployment, ensure all required configuration files and environment settings are properly prepared.
+
+### Configuration Validation
+
+* **`kubeadm-config.yaml`**: Verify that the Kubernetes version and Flannel network settings are correct for your environment.
+
+  * Set the Flannel subnet:
+
+    ```yaml
+    podSubnet: "10.244.0.0/16"
+    ```
+  * Check the latest supported Kubernetes versions at:
+    [https://kubernetes.io/releases/](https://kubernetes.io/releases/)
+
+Update these configurations if required **before initializing the cluster**.
+
+---
+
+### Hostname and DNS Configuration
+
+Set Hostname of the systems:
+
+```bash
+sudo hostnamectl set-hostname new-hostname
+```
+
+Add the hostname-to-IP mappings on each node in `/etc/hosts`.
+For example:
+
+```bash
+echo "192.168.1.9  lb1.k8s.local" | sudo tee -a /etc/hosts
+echo "192.168.1.10 lb2.k8s.local" | sudo tee -a /etc/hosts
+echo "192.168.1.1  pc11.k8s.local" | sudo tee -a /etc/hosts
+echo "192.168.1.3  pc2.k8s.local" | sudo tee -a /etc/hosts
+echo "192.168.1.5  pc3.k8s.local" | sudo tee -a /etc/hosts
+echo "192.168.1.2  pc1.k8s.local" | sudo tee -a /etc/hosts
+echo "192.168.1.4  pc4.k8s.local" | sudo tee -a /etc/hosts
+echo "192.168.1.6  pc6.k8s.local" | sudo tee -a /etc/hosts
+echo "192.168.1.7  pc7.k8s.local" | sudo tee -a /etc/hosts
+echo "192.168.1.8  pc8.k8s.local" | sudo tee -a /etc/hosts
+# (Repeat for all nodes)
+```
+
+---
+
+### System Requirements
+
+Before you begin, ensure the following:
+
+* **Ansible Control Node:** A management host with Ansible installed.
+* **Passwordless SSH:** Passwordless SSH access from the Ansible control node to all 9 cluster nodes.
+
+---
 
 ## Automated Deployment (Recommended)
 
