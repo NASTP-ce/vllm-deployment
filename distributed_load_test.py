@@ -17,8 +17,13 @@ import os
 
 # Configuration
 SERVER_HOST = "192.168.1.1"
-SERVER_PORT = "8000"
-BASE_URL = f"http://{SERVER_HOST}:{SERVER_PORT}"
+SERVER_PORT = "80" 
+if SERVER_PORT and SERVER_PORT != "80":
+    print(f"Using server {SERVER_HOST}:{SERVER_PORT}")
+    BASE_URL = f"http://{SERVER_HOST}:{SERVER_PORT}"
+else:
+    print(f"Using server {SERVER_HOST}")
+    BASE_URL = f"http://{SERVER_HOST}"
 MODEL_ID = "/mnt/data/office_work/vllms_inference/3.1-8b-instruct"
 
 TEST_MESSAGES = [
@@ -115,6 +120,75 @@ def write_user_summary(log_dir, node_id, user_id, total_messages, total_time, av
         f.write(f"Avg Tokens/Message:    {total_tokens/total_messages if total_messages > 0 else 0:.1f}\n")
         f.write("=" * 80 + "\n")
 
+ENDPOINT_TYPE = None  # will be set to 'chat' or 'completions'
+
+def detect_endpoint(base_url, model_id):
+    """Try chat and completions endpoints to set ENDPOINT_TYPE with verbose debugging."""
+    print("\n🔍 Detecting endpoint type...")
+    
+    # Try chat endpoint
+    test_payload_chat = {
+        "model": model_id,
+        "messages": [{"role": "user", "content": "ping"}],
+        "stream": False,
+        "max_tokens": 5
+    }
+    
+    print(f"  Testing: {base_url}/v1/chat/completions")
+    try:
+        r = requests.post(f"{base_url}/v1/chat/completions", json=test_payload_chat, timeout=10)
+        print(f"    Status: {r.status_code}")
+        if r.status_code != 200:
+            print(f"    Response: {r.text[:200]}")
+        if r.status_code == 200:
+            print("  ✓ Chat endpoint works!")
+            return 'chat'
+    except Exception as e:
+        print(f"    Error: {str(e)[:100]}")
+    
+    # Try completions endpoint
+    test_payload_comp = {
+        "model": model_id,
+        "prompt": "ping",
+        "stream": False,
+        "max_tokens": 5
+    }
+    
+    print(f"  Testing: {base_url}/v1/completions")
+    try:
+        r = requests.post(f"{base_url}/v1/completions", json=test_payload_comp, timeout=10)
+        print(f"    Status: {r.status_code}")
+        if r.status_code != 200:
+            print(f"    Response: {r.text[:200]}")
+        if r.status_code == 200:
+            print("  ✓ Completions endpoint works!")
+            return 'completions'
+    except Exception as e:
+        print(f"    Error: {str(e)[:100]}")
+    
+    return None
+
+def get_available_models(base_url):
+    """Fetch and display available models"""
+    try:
+        print(f"\n📋 Fetching available models from {base_url}/v1/models...")
+        r = requests.get(f"{base_url}/v1/models", timeout=10)
+        if r.status_code == 200:
+            models = r.json()
+            if 'data' in models:
+                print(f"  Found {len(models['data'])} model(s):")
+                for model in models['data']:
+                    model_id = model.get('id', 'unknown')
+                    print(f"    - {model_id}")
+                return [m.get('id') for m in models['data']]
+            else:
+                print(f"  Response: {r.text}")
+        else:
+            print(f"  Error {r.status_code}: {r.text[:200]}")
+    except Exception as e:
+        print(f"  Error: {str(e)}")
+    return []
+
 def simulate_user(user_id, node_id, duration, stats, log_dir):
     """Simulate user for distributed test with detailed logging"""
     stats.inc_active()
@@ -136,19 +210,32 @@ def simulate_user(user_id, node_id, duration, stats, log_dir):
     while time.time() - start < duration:
         try:
             message = random.choice(TEST_MESSAGES)
-            payload = {
-                "model": MODEL_ID,
-                "messages": [{"role": "user", "content": f"[Node{node_id}User{user_id}] {message}"}],
-                "temperature": 0.7,
-                "max_tokens": 512,
-                "stream": True
-            }
+            # build payload depending on detected endpoint
+            if ENDPOINT_TYPE == 'chat':
+                payload = {
+                    "model": MODEL_ID,
+                    "messages": [{"role": "user", "content": f"[Node{node_id}User{user_id}] {message}"}],
+                    "temperature": 0.7,
+                    "max_tokens": 512,
+                    "stream": True
+                }
+                url = f"{BASE_URL}/v1/chat/completions"
+            else:
+                # completions-style (prompt)
+                payload = {
+                    "model": MODEL_ID,
+                    "prompt": f"[Node{node_id}User{user_id}] {message}",
+                    "temperature": 0.7,
+                    "max_tokens": 512,
+                    "stream": True
+                }
+                url = f"{BASE_URL}/v1/completions"
             
             stats.record_sent()
             req_start = time.time()
             
             response = requests.post(
-                f"{BASE_URL}/v1/chat/completions",
+                url,
                 headers={"Content-Type": "application/json"},
                 json=payload,
                 stream=True,
@@ -177,15 +264,31 @@ def simulate_user(user_id, node_id, duration, stats, log_dir):
                             break
                         try:
                             parsed = json.loads(data)
-                            if parsed.get('choices'):
-                                content = parsed['choices'][0].get('delta', {}).get('content', '')
-                                if content:
-                                    if first_token_time is None:
-                                        first_token_time = time.time()
-                                    full_resp += content
-                                    tok_count += 1
-                        except:
+                        except Exception:
                             continue
+                        # support both chat.delta.content and completion.text
+                        choices = parsed.get('choices') or []
+                        if not choices:
+                            continue
+                        content = ""
+                        ch0 = choices[0]
+                        # chat streaming (delta -> content)
+                        delta = ch0.get('delta', {})
+                        if isinstance(delta, dict):
+                            content = delta.get('content', '') or content
+                        # completions-style
+                        if not content:
+                            content = ch0.get('text', '') or content
+                        # fallback: message.content (some servers)
+                        if not content:
+                            msg = ch0.get('message', {}) or {}
+                            if isinstance(msg, dict):
+                                content = msg.get('content', '') or content
+                        if content:
+                            if first_token_time is None:
+                                first_token_time = time.time()
+                            full_resp += content
+                            tok_count += 1
             
             rt = time.time() - req_start
             tokens_per_sec = tok_count / rt if rt > 0 else 0
@@ -249,15 +352,20 @@ def main():
     parser.add_argument('--users', type=int, default=12, help='Number of concurrent users')
     parser.add_argument('--duration', type=int, default=300, help='Test duration in seconds')
     parser.add_argument('--server', type=str, default='192.168.1.1', help='Server IP')
-    parser.add_argument('--port', type=str, default='8000', help='Server port')
+    parser.add_argument('--port', type=str, default='80', help='Server port')
     parser.add_argument('--log-dir', type=str, default='load_test_logs', help='Directory for log files')
+    parser.add_argument('--model', type=str, default=None, help='Model ID (overrides default)')
     
     args = parser.parse_args()
     
-    global SERVER_HOST, SERVER_PORT, BASE_URL
+    global SERVER_HOST, SERVER_PORT, BASE_URL, MODEL_ID
     SERVER_HOST = args.server
     SERVER_PORT = args.port
-    BASE_URL = f"http://{SERVER_HOST}:{SERVER_PORT}"
+    
+    if SERVER_PORT and SERVER_PORT != "80":
+        BASE_URL = f"http://{SERVER_HOST}:{SERVER_PORT}"
+    else:
+        BASE_URL = f"http://{SERVER_HOST}"
     
     # Create log directory
     log_dir = args.log_dir
@@ -285,10 +393,44 @@ def main():
         if not response.ok:
             print("❌ Server not reachable")
             sys.exit(1)
-        print("✓ Server is reachable\n")
-    except:
-        print("❌ Cannot connect to server")
+        print("✓ Server is reachable")
+    except Exception as e:
+        print(f"❌ Cannot connect to server: {e}")
         sys.exit(1)
+    
+    # Get available models
+    available_models = get_available_models(BASE_URL)
+    
+    # Override model if specified
+    if args.model:
+        MODEL_ID = args.model
+        print(f"\n📦 Using specified model: {MODEL_ID}")
+    elif available_models:
+        # Use first available model if default doesn't exist
+        if MODEL_ID not in available_models:
+            print(f"\n⚠️  Default model '{MODEL_ID}' not found")
+            MODEL_ID = available_models[0]
+            print(f"📦 Using first available model: {MODEL_ID}")
+        else:
+            print(f"\n📦 Using default model: {MODEL_ID}")
+    
+    # Detect endpoint
+    global ENDPOINT_TYPE
+    ENDPOINT_TYPE = detect_endpoint(BASE_URL, MODEL_ID)
+    
+    if not ENDPOINT_TYPE:
+        print("\n❌ Could not detect supported endpoint!")
+        print("\nTroubleshooting steps:")
+        print("1. Verify model ID is correct (use --model flag to specify)")
+        print("2. Check if server is running: curl -sS http://192.168.1.1/v1/models")
+        print("3. Test manually:")
+        print(f"   curl -X POST {BASE_URL}/v1/chat/completions \\")
+        print(f'     -H "Content-Type: application/json" \\')
+        print(f'     -d \'{{"model": "{MODEL_ID}", "messages": [{{"role": "user", "content": "hi"}}]}}\'')
+        sys.exit(1)
+    
+    print(f"✓ Detected endpoint: {ENDPOINT_TYPE}")
+    print(f"✓ Using model: {MODEL_ID}\n")
     
     stats = DistributedStats(args.node_id)
     
