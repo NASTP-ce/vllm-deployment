@@ -4,39 +4,54 @@ This guide describes how to provision a highly available Kubernetes control plan
 
 ## Architecture
 
-- **Control Plane Nodes:** 192.168.1.9, 192.168.1.3, 192.168.1.8
+- **Control Plane Nodes:** 192.168.1.1, 192.168.1.3, 192.168.1.5
 - **VIP:** 192.168.1.100 (used as `controlPlaneEndpoint` in kubeadm config)
 - **HAProxy:** Load balances traffic to all healthy control plane nodes
 - **Keepalived:** Manages the VIP failover between control plane nodes
 
-## Steps
+### 🖥️ Change the Hostname
 
-1. **Install HAProxy and Keepalived** on all control plane nodes:
-   ```bash
-   sudo apt update
-   sudo apt install haproxy keepalived -y
-   ```
+Set a new hostname for your node using the following command:
 
-1. **Backup the default HAProxy config (recommended):**
+```bash
+sudo hostnamectl set-hostname <new-hostname>
+```
 
-    ```bash
-    sudo cp /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg.bak
-    ```
+*(Replace `<new-hostname>` with your desired hostname, e.g., `lb1.k8s.local` or `cp1.k8s.local`.)*
 
-1. **Clear the default HAProxy config:**
+---
 
-    ```bash
-    echo "1" | sudo tee /etc/haproxy/haproxy.cfg
+## ⚙️ HAProxy
 
-    ```
+Update your system packages and install **HAProxy** and **Keepalived**:
 
-1. **Edit the HAProxy config:**
+```bash
+sudo apt update && sudo apt install -y haproxy keepalived
+```
 
-    ```bash
-    sudo nano /etc/haproxy/haproxy.cfg
-    ```
+*(Run this command on all **load balancer** or **control plane** nodes, depending on your architecture.)*
 
-2. **add the following data in it:**
+
+**Backup the default HAProxy config (recommended):**
+
+```bash
+sudo cp /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg.bak
+```
+
+**Clear the default HAProxy config:**
+
+```bash
+echo "" | sudo tee /etc/haproxy/haproxy.cfg
+
+```
+
+**Edit the HAProxy config:**
+
+```bash
+sudo nano /etc/haproxy/haproxy.cfg
+```
+
+**add the following data in it:**
 
    ```bash
     # ========== Global settings ==========
@@ -75,9 +90,9 @@ This guide describes how to provision a highly available Kubernetes control plan
         # Control Plane nodes (API servers on port 6443)
         # fall 3 → mark server as DOWN after 3 failed checks
         # rise 2 → mark server as UP after 2 successful checks
-        server cp1 192.168.1.9:6443 check fall 3 rise 2
-        server cp2 192.168.1.3:6443 check fall 3 rise 2
-        server cp3 192.168.1.8:6443 check fall 3 rise 2
+        server pc1 192.168.1.1:6443 check fall 3 rise 2
+        server pc3 192.168.1.3:6443 check fall 3 rise 2
+        server pc5 192.168.1.5:6443 check fall 3 rise 2
 
 
    ```
@@ -88,13 +103,30 @@ This guide describes how to provision a highly available Kubernetes control plan
 sudo systemctl restart haproxy 
 ```
 
-## **Keepalived config** for your 3 control-plane nodes:
+## 🧩 Keepalived Configuration
 
----
+Configure **Keepalived** on each load balancer node to manage the **Virtual IP (VIP)** failover.
+Here’s your fully rewritten **Keepalived section**, following the exact structure and tone of your HAProxy setup — clean, consistent, and formatted for clarity:
 
-### `/etc/keepalived/keepalived.conf`
+**Backup the default Keepalived config (recommended):**
 
-**On control-plane-1 (192.168.1.9, MASTER):**
+```bash
+sudo cp /etc/keepalived/keepalived.conf /etc/keepalived/keepalived.conf.bak
+```
+
+**Clear the default Keepalived config:**
+
+```bash
+echo "" | sudo tee /etc/keepalived/keepalived.conf
+```
+
+**If config file is not created, then crete and edit with:**
+
+```bash
+sudo nano /etc/keepalived/keepalived.conf
+```
+
+**Add the following data in it (on Load Balancer-1 — MASTER):**
 
 ```conf
 vrrp_instance VI_1 {
@@ -103,48 +135,33 @@ vrrp_instance VI_1 {
     virtual_router_id 51
     priority 101
     advert_int 1
+
     authentication {
         auth_type PASS
         auth_pass 42
     }
+
     virtual_ipaddress {
         192.168.1.100
     }
 }
 ```
 
-**On control-plane-2 (192.168.1.3, BACKUP):**
+**On Load Balancer-2 (192.168.1.10, BACKUP):**
 
 ```conf
 vrrp_instance VI_1 {
     state BACKUP
-    interface enp0s31f6
+    interface enp2s0
     virtual_router_id 51
     priority 100
     advert_int 1
+
     authentication {
         auth_type PASS
         auth_pass 42
     }
-    virtual_ipaddress {
-        192.168.1.100
-    }
-}
-```
 
-**On control-plane-3 (192.168.1.8, BACKUP):**
-
-```conf
-vrrp_instance VI_1 {
-    state BACKUP
-    interface eno1
-    virtual_router_id 51
-    priority 99
-    advert_int 1
-    authentication {
-        auth_type PASS
-        auth_pass 42
-    }
     virtual_ipaddress {
         192.168.1.100
     }
@@ -153,52 +170,80 @@ vrrp_instance VI_1 {
 
 ---
 
-✅ Replace `<your_network_interface>` with your NIC (e.g., `eno1` `eth0`, `enp0s31f6` , `ens33`).
-✅ Restart Keepalived on all nodes, the VIP `192.168.1.100` should float between them.
-
+- Replace `<your_network_interface>` with your actual NIC name (e.g., `eno1`, `eth0`, `enp0s31f6`, `ens33`).
+- Restart **Keepalived** on both load balancer nodes — the **VIP `192.168.1.100`** should automatically float between them depending on which node is active.
 
 ---
 
-### ✅ Checking if Keepalived is working
+**Restart Keepalived:**
 
-1. **Check VIP on MASTER**
+```bash
+sudo systemctl restart keepalived
+sudo systemctl enable keepalived
+```
+
+---
+
+### 🧪 Verify VIP Assignment
+
+Check if the **Virtual IP (VIP)** is currently bound to the **MASTER** load balancer:
+
+```bash
+ip a | grep 192.168.1.100
+```
+
+- You should see the VIP assigned to the MASTER node (`lb1.k8s.local`).
+- If the MASTER node fails, the VIP will automatically shift to the BACKUP node (`lb2.k8s.local`).
+
+---
+
+### ✅ Verifying Keepalived Functionality
+
+1. **Check VIP on MASTER:**
 
    ```bash
    ip addr show <interface> | grep 192.168.1.100
-   # or simply
+   # Example:
    ip a | grep eno1
    ```
 
-   ✅ You should see `192.168.1.100` bound to the MASTER node.
+   ✅ The VIP `192.168.1.100` should appear on the MASTER node.
 
-2. **Test failover**
-   On MASTER:
+---
+
+2. **Test Failover:**
+
+   Stop Keepalived on the MASTER node to simulate failure:
 
    ```bash
    sudo systemctl stop keepalived
    ```
 
-   Then on a BACKUP node:
+   Then, verify the VIP has moved to the BACKUP node:
 
    ```bash
    ip a | grep eno1
    ```
 
-   ✅ The VIP `192.168.1.100` should appear on the BACKUP node.
+   ✅ The VIP `192.168.1.100` should now be visible on the BACKUP node (`lb2.k8s.local`).
 
-3. **Restore MASTER**
+---
+
+3. **Restore MASTER Node:**
+
+   Restart Keepalived on the MASTER:
 
    ```bash
    sudo systemctl start keepalived
    ```
 
-   ✅ The VIP should float back to the MASTER.
+   ✅ The VIP should float back automatically to the MASTER node.
 
 ---
 
-### ✅ Checking if HAProxy is working
+### ✅ Verifying HAProxy Functionality
 
-1. **Test API health via VIP**
+1. **Test Kubernetes API health via the VIP:**
 
    ```bash
    curl -k https://192.168.1.100:6443/healthz
@@ -210,44 +255,70 @@ vrrp_instance VI_1 {
    ok
    ```
 
-2. **Check HAProxy logs** (shows connections forwarded):
+---
+
+2. **Check HAProxy Logs:**
+
+   View connection forwarding activity:
 
    ```bash
    sudo tail -f /var/log/haproxy.log
    ```
 
-   or check system journal:
+   or check via systemd journal:
 
    ```bash
    journalctl -u haproxy -f
    ```
 
-3. **Simulate node failure**
-   Stop kubelet on one control-plane node (simulating API server down):
+---
+
+3. **Simulate Control Plane Node Failure:**
+
+   Stop the `kubelet` service on one control plane node to simulate an API server failure:
 
    ```bash
    sudo systemctl stop kubelet
    ```
 
-   Then run again:
+   Then, test again:
 
    ```bash
    curl -k https://192.168.1.100:6443/healthz
    ```
 
-   ✅ It should still return `ok` because HAProxy routes to healthy control-plane nodes.
+   ✅ The response should still be `ok`, indicating that HAProxy successfully rerouted traffic to healthy API servers.
 
 ---
 
-4. **Restart services**:
+4. **Restart Both Services:**
+
    ```bash
    sudo systemctl restart haproxy keepalived
    ```
 
-5. **Set `controlPlaneEndpoint` in your kubeadm config to the VIP:**
+---
+
+5. **Set the `controlPlaneEndpoint` in Your kubeadm Configuration:**
+
    ```yaml
    controlPlaneEndpoint: "192.168.1.100:6443"
    ```
 
-## References
-- See [Kubernetes HA documentation](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/) for more details.
+---
+
+## 🩺 High Availability Health Check
+
+For production environments, it’s recommended to implement an **active health check** script (using a `systemd` service or `cron` job) to continuously monitor the **Virtual IP (VIP)** and **HAProxy** health status.
+
+👉 Refer to the detailed implementation guide here:
+[**docs/health_check_haproxy.md**](health_check_haproxy.md)
+
+---
+## 📘 References
+
+* [Kubernetes High Availability Documentation](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/)
+* [HAProxy Documentation](https://www.haproxy.org/)
+* [Keepalived Documentation](https://keepalived.readthedocs.io/)
+
+---
