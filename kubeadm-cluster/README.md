@@ -26,6 +26,8 @@ The Kubernetes cluster is architected for **high availability (HA)**, **scalabil
   For complete setup and failover details, see
   👉 [docs/high-availability-haproxy-keepalived.md](docs/high-availability-haproxy-keepalived.md)
 
+  For [DNS Management](docs/dns.md )
+
 ---
 
 ## Load Balancer Layer
@@ -48,8 +50,8 @@ Three hybrid nodes (control + worker) maintain cluster state and provide API ser
 | Node            | Hostname / FQDN | IP Address    | Role                   |
 | --------------- | --------------- | ------------- | ---------------------- |
 | Control Plane 1 | `pc1.k8s.local` | `192.168.1.1` | Control Plane + Worker |
-| Control Plane 2 | `cp3.k8s.local` | `192.168.1.3` | Control Plane + Worker |
-| Control Plane 3 | `cp5.k8s.local` | `192.168.1.5` | Control Plane + Worker |
+| Control Plane 2 | `pc3.k8s.local` | `192.168.1.3` | Control Plane + Worker |
+| Control Plane 3 | `pc5.k8s.local` | `192.168.1.5` | Control Plane + Worker |
 
 ---
 
@@ -94,8 +96,11 @@ Dedicated worker nodes handle all user workloads and deployments.
                  ---------------------------------
                  |          Worker Nodes         |
                  ---------------------------------
-  pc1.k8s.local | worker2.k8s.local | worker3.k8s.local | worker4.k8s.local | worker5.k8s.local
-  192.168.1.2       | 192.168.1.4       | 192.168.1.6       | 192.168.1.7       | 192.168.1.8
+                                |               
+  +---------------------------------------------------------------------------------------------------++               
+  |   pc2.k8s.local     |  pc4.k8s.local      | pc6.k8s.local     | pc7.k8s.local     | pc8.k8s.local  |
+  |   192.168.1.2       |   192.168.1.4       | 192.168.1.6       | 192.168.1.7       | 192.168.1.8    |
+  +---------------------------------------------------------------------------------------------------++ 
 ```
 
 ---
@@ -142,7 +147,7 @@ echo "192.168.1.4  pc4.k8s.local" | sudo tee -a /etc/hosts
 echo "192.168.1.6  pc6.k8s.local" | sudo tee -a /etc/hosts
 echo "192.168.1.7  pc7.k8s.local" | sudo tee -a /etc/hosts
 echo "192.168.1.8  pc8.k8s.local" | sudo tee -a /etc/hosts
-# (Repeat for all nodes)
+
 ```
 
 ---
@@ -173,11 +178,8 @@ This includes details on:
 
 For reference or manual setup, the following steps outline the process performed by the automation scripts.
 
-**Prepare All Nodes**
-
-      * Disable swap.
-      * Install container runtime (e.g., `containerd`).
-      * Install Kubernetes packages: `kubeadm`, `kubelet`, and `kubectl`.
+🧑‍💻 For **manual deployment** (step-by-step setup and configuration instructions), see:
+[**Manual Kubernetes Deployment Guide → docs/2.configure_master_node.md**](kubeadm-cluster/docs/2.configure_master_node.md)
 
 ---
 
