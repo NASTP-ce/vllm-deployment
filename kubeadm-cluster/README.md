@@ -113,13 +113,13 @@ Before starting the deployment, ensure all required configuration files and envi
 
 * **`kubeadm-config.yaml`**: Verify that the Kubernetes version and Flannel network settings are correct for your environment.
 
-  * Set the Flannel subnet:
+* Set the Flannel subnet:
 
-    ```yaml
-    podSubnet: "10.244.0.0/16"
-    ```
-  * Check the latest supported Kubernetes versions at:
-    [https://kubernetes.io/releases/](https://kubernetes.io/releases/)
+```yaml
+podSubnet: "10.244.0.0/16"
+```
+* Check the latest supported Kubernetes versions at:
+[https://kubernetes.io/releases/](https://kubernetes.io/releases/)
 
 Update these configurations if required **before initializing the cluster**.
 
@@ -169,10 +169,10 @@ This repository is designed for automation. All inventory, configuration variabl
 
 This includes details on:
 
-  * Setting up the Ansible inventory and host groups.
-  * Customizing cluster configuration variables.
-  * Executing the deployment playbooks.
-  * Directory structure and automation best practices.
+* Setting up the Ansible inventory and host groups.
+* Customizing cluster configuration variables.
+* Executing the deployment playbooks.
+* Directory structure and automation best practices.
 
 ## Manual Deployment Steps
 
@@ -185,89 +185,237 @@ For reference or manual setup, the following steps outline the process performed
 
 ## Spinning up Cluster
 
-### Sandbox Image Note (change it with ansible for all nodes)
-
-  Kubeadm expects the CRI sandbox image `registry.k8s.io/pause:3.9`, but some runtimes (e.g., containerd) may default to `pause:3.8`. To avoid warnings during cluster initialization, update your container runtime configuration.
-
-  For **containerd**, edit `/etc/containerd/config.toml` and set:
-
-  ```toml
-  sandbox_image = "registry.k8s.io/pause:3.9"
-  ```
-
-  Then restart containerd:
-
-  ```bash
-  sudo systemctl restart containerd
-  ```
+Here’s a polished and professional rewrite of that section — consistent with your documentation style and structured for clarity:
 
 ---
 
-1. **Stop HAProxy Temporarily**
+## 🚀 Spinning Up the Cluster
 
-   Stop the HAProxy service so that port **6443** is free for the cluster initialization (recommended).
+Before initializing the Kubernetes control plane, pull all required container images to ensure faster setup and consistent versions across all nodes:
 
-   ```bash
-   sudo systemctl stop haproxy
-   ```
+```bash
+sudo kubeadm config images pull
+```
 
-2. **Validate CRI:**
+---
 
-   ```bash
-   crictl --runtime-endpoint unix:///var/run/containerd/containerd.sock version   
-   ```
-   
-2. **Initialize the First Control Plane Node**
+### 🧩 Sandbox Image Configuration (Automate via Ansible)
 
-   On node `192.168.1.9`, run the initialization using the declarative configuration file:
+Kubeadm expects the **CRI sandbox image**:
+`registry.k8s.io/pause:3.9`
 
-   ```bash
-   sudo kubeadm init --config=kubeadm-config.yaml
-   ```
+However, some container runtimes (e.g., **containerd**) may default to an older version such as `pause:3.8`.
+To prevent compatibility warnings during cluster initialization, update the container runtime configuration.
 
+#### For **containerd**:
 
-2. **If You Encounter Errors During Initialization**
+Edit the configuration file:
 
-  - Troubleshoot and resolve any reported errors.
-  - If needed, reset kubeadm and retry the initialization:
+```bash
+sudo nano /etc/containerd/config.toml
+```
 
-    ```bash
-    sudo kubeadm reset -f
-    ```
+Find and update the following line:
 
-  - For a detailed reset procedure, see: [docs/reset_master_node_new.md](docs/reset_master_node_new.md)
+```toml
+sandbox_image = "registry.k8s.io/pause:3.9"
+```
 
-3. **Restart HAProxy**
+Then restart the containerd service to apply the change:
 
-   After the initialization completes, start the HAProxy service again:
+```bash
+sudo systemctl restart containerd
+```
 
-   ```bash
-   sudo systemctl start haproxy
-   ```
+✅ **Tip:**
+For consistency across all nodes, this configuration can be automated using **Ansible** by applying the same update to each host’s `/etc/containerd/config.toml`.
+ 
+---
+
+**Validate CRI:**
+
+```bash
+sudo crictl --runtime-endpoint unix:///var/run/containerd/containerd.sock version   
+```
+
+---
+
+## 🧭 Initialize the First Control Plane Node
+
+On the **primary control plane node** (`192.168.1.1`), initialize the cluster using the declarative configuration file:
+
+```bash
+sudo kubeadm init --config=kubeadm-config.yaml
+```
+
+---
+
+### ⚠️ If You Encounter Initialization Errors
+
+* Review and resolve any reported issues during the process.
+* If necessary, reset the kubeadm setup and retry initialization.
+  Refer to: [**Reset Control Plane Node → docs/reset_master_node_new.md**](docs/reset_master_node_new.md)
+
+---
+
+### ⚙️ Configure `kubectl` Access
+
+To manage the cluster from the control plane node, set up the Kubernetes admin configuration:
+
+```bash
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+```
+
+---
+
+### ✅ Verify the Cluster Status
+
+Check that the control plane node is active and ready:
+
+```bash
+kubectl get nodes
+```
 
 ---
 
 
-3.  **Configure `kubectl`**
+### 🧩 Installing the CNI Plugin
 
-      * To manage the cluster from the control plane node, copy the admin configuration:
-        ```bash
-        mkdir -p $HOME/.kube
-        sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-        sudo chown $(id -u):$(id -g) $HOME/.kube/config
-        ```
+You should install the **CNI (Container Network Interface)** plugin **immediately after initializing the first control plane** and **before joining any worker nodes**.
 
-4.  **Install the CNI Plugin**
+**Reason:**
+Worker nodes depend on a functional pod network to communicate with the control plane.
+If no CNI is installed, worker nodes may remain in the `NotReady` state.
 
-      * Deploy Flannel to enable pod-to-pod communication:
-        ```bash
-        kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
-        ```
+---
 
-5.  **Join Additional Nodes**
+### 🌐 Option 1 — Install **Calico** (Advanced networking)
 
-      * **Control Plane Nodes**: Use the `kubeadm join` command provided in the output of the `init` step (with the `--control-plane` flag) to join `192.168.1.3` and `192.168.1.8`.
-      * **Worker Nodes**: Use the standard `kubeadm join` command to add the remaining worker nodes to the cluster.
+On the **first control plane node (`192.168.1.1`)**, install Calico after completing `kubeadm init`:
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/calico.yaml
+```
+
+---
+
+### 🌐 Option 2 — Install **Flannel** (Basic overlay network)
+
+Alternatively, deploy **Flannel** to enable pod-to-pod networking:
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+```
+
+---
+
+### ✅ Verify CNI Installation
+
+Check that all CNI-related pods (Calico or Flannel) are running successfully:
+
+```bash
+kubectl get pods -n kube-system
+```
+
+Wait until all pods report a `Running` status before proceeding to join other control planes or worker nodes.
+
+
+## 🧩 Join Additional Control Plane Nodes
+
+Once the first control plane (`192.168.1.1`) is initialized, the remaining control plane nodes (`192.168.1.3` and `192.168.1.5`) can be joined to the cluster for high availability.
+
+### 📜 Generate the Join Command on the Primary Node
+
+On the first control plane node (`192.168.1.1`), generate a join command with a control-plane token and discovery certificate hash:
+
+```bash
+kubeadm token create --print-join-command
+```
+
+Example output:
+
+```bash
+kubeadm join 192.168.1.100:6443 --token <token> \
+  --discovery-token-ca-cert-hash sha256:<hash> \
+  --control-plane
+```
+
+> 🧠 **Tip (Memorization Trick):**
+> Remember “**Join–Token–Hash–Control**” → the 4 ingredients for every HA control-plane join.
+
+---
+
+### 🖥️ Run the Join Command on Each Additional Control Plane Node
+
+On nodes `192.168.1.3` and `192.168.1.5`, execute the generated join command:
+
+```bash
+sudo kubeadm join 192.168.1.100:6443 --token <token> \
+  --discovery-token-ca-cert-hash sha256:<hash> \
+  --control-plane
+```
+
+> Replace `192.168.1.100` with your **HAProxy VIP** or API load balancer address.
+
+---
+
+### 🔄 Verify Control Plane Nodes
+
+After all control planes are joined, check cluster status from the primary control plane:
+
+```bash
+kubectl get nodes -o wide
+```
+
+Expected output:
+
+```
+NAME            STATUS   ROLES           AGE   VERSION   INTERNAL-IP
+cp-1 (192.168.1.1)   Ready    control-plane   10m   v1.30.0   192.168.1.1
+cp-2 (192.168.1.3)   Ready    control-plane   2m    v1.30.0   192.168.1.3
+cp-3 (192.168.1.5)   Ready    control-plane   1m    v1.30.0   192.168.1.5
+```
+
+---
+
+## ⚙️ Join Worker Nodes to the Cluster
+
+After installing the CNI and confirming all control planes are `Ready`, join your worker nodes.
+
+On each worker node (e.g., `192.168.1.7`, `192.168.1.9`), run the **join command** generated from the control plane:
+
+```bash
+sudo kubeadm join 192.168.1.100:6443 --token <token> \
+  --discovery-token-ca-cert-hash sha256:<hash>
+```
+
+> Use the same **HAProxy VIP (192.168.1.100)** for consistent access.
+
+---
+
+### 🧾 Verify the Cluster
+
+From any control plane node:
+
+```bash
+kubectl get nodes -o wide
+```
+
+Expected output:
+
+```
+NAME             STATUS   ROLES           AGE   VERSION   INTERNAL-IP
+pc-1             Ready    control-plane   10m   v1.30.0   192.168.1.1
+pc-3             Ready    control-plane   8m    v1.30.0   192.168.1.3
+pc-5             Ready    control-plane   7m    v1.30.0   192.168.1.5
+pc-2         	 Ready    <none>          3m    v1.30.0   192.168.1.7
+pc-4         	 Ready    <none>          2m    v1.30.0   192.168.1.9
+pc-6         	 Ready    <none>          3m    v1.30.0   192.168.1.7
+pc-7         	 Ready    <none>          2m    v1.30.0   192.168.1.9
+pc-8         	 Ready    <none>          3m    v1.30.0   192.168.1.7
+```
 
 
 ---

@@ -1,49 +1,52 @@
 # Kubeadm configuration for a highly available cluster with hybrid control plane nodes.
-# This file is used to initialize the first control plane node (192.168.1.9).
+# This file is used to initialize the first control plane node (192.168.1.1).
+
 apiVersion: kubeadm.k8s.io/v1beta3
 kind: InitConfiguration
 localAPIEndpoint:
-  # IP address of the node you are running 'kubeadm init' on.
+  # IP address of the node where 'kubeadm init' is executed.
   advertiseAddress: "192.168.1.1"
   bindPort: 6443
 nodeRegistration:
   name: "control-plane-1"
   criSocket: "unix:///var/run/containerd/containerd.sock"
-  # This is the endpoint socket through which the kubelet talks to the container runtime. Make sure it matches your container runtime's socket path.
+  # Ensure the path matches your container runtime socket.
+
 ---
+
 apiVersion: kubeadm.k8s.io/v1beta3
 kind: ClusterConfiguration
-# Use a specific, stable Kubernetes version.
+# Stable Kubernetes version
 kubernetesVersion: "v1.30.5"
-# The cluster name.
+
+# Cluster name
 clusterName: "gpt-cluster"
-# The controlPlaneEndpoint is the address of your load balancer. Make sure you’re running something like HAProxy + Keepalived (for VIP failover) or another load balancer on-prem. 
+
+# The controlPlaneEndpoint is your load balancer's VIP
 controlPlaneEndpoint: "192.168.1.100:6443"
-# The apiServer.certSANs list must include your load balancer VIP and all control plane IPs.
+
 apiServer:
   certSANs:
-  # This avoids TLS errors when joining control planes and accessing the API server.
-  # This is a placeholder (k8s-api.example.com). Replace with your actual DNS name for the VIP
-  # or remove this line if you don't have one.
-  #- "k8s-api.example.com"
-  - "192.168.1.100"
-  - "192.168.1.1"
-  - "192.168.1.3"
-  - "192.168.1.5"
-  - "pc1"
-  - "pc2"
-  - "pc3"
-  - "pc4"
-  - "pc5"
-  - "pc6"
-  - "pc7"
-  - "pc8"
-# Networking configuration for Flannel. Matches Flannel’s default pod CIDR. Adjust if needed. 
+    # Include VIP + all control-plane IPs to avoid TLS errors
+    - "192.168.1.100"   # VIP (HAProxy + Keepalived)
+    - "192.168.1.1"     # Control Plane 1
+    - "192.168.1.3"     # Control Plane 2
+    - "192.168.1.5"     # Control Plane 3
+    - "192.168.1.9"     # HAProxy 1
+    - "192.168.1.10"    # HAProxy 2
+  timeoutForControlPlane: 4m0s
+
+controllerManager: {}
+scheduler: {}
+
+# Networking — ensure this matches your chosen CNI (Flannel default)
 networking:
   podSubnet: "10.244.0.0/16"
+  serviceSubnet: "10.96.0.0/12"
+
 ---
-# Ensure the kubelet's cgroup driver matches the container runtime's.
+
+# Ensure kubelet's cgroup driver matches container runtime.
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 cgroupDriver: "systemd"
-
