@@ -1,6 +1,6 @@
 ---
 - name: Install and configure containerd
-  hosts: hassan   # all, clients, jahangir or hassan
+  hosts: all   # all, clients, jahangir or hassan
   become: yes
   roles:
     - containerd

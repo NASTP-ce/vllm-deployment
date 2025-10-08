@@ -1,6 +1,6 @@
 ---
 - name: Disable swap on multiple Ubuntu machines
-  hosts: clients  # all, clients, jahangir or hassan
+  hosts: all  # all, clients, jahangir or hassan
   become: true
 
   tasks:

@@ -4,7 +4,35 @@ This project demonstrates how to deploy **vLLM inference** using the **Llama 3.2
 
 ---
 
-## ⚙️ Environment Setup
+## 📦 Model Download
+
+Download the desired **Llama 3.2** model using Hugging Face CLI:
+
+```bash
+huggingface-cli download meta-llama/Llama-3.2-3B-Instruct \
+  --local-dir models/Llama-3.2-3B-Instruct
+```
+
+For a smaller model (e.g., 1B):
+
+```bash
+huggingface-cli download meta-llama/Llama-3.2-1B \
+  --local-dir models/Llama-3.2-1B
+```
+
+---
+
+## 🚀 Components Overview
+
+1. **vLLM Inference Server**
+   An OpenAI-compatible API server powered by `vLLM`, optimized for efficient inference.
+
+2. **Frontend Chatbot**
+   A lightweight HTML-based chatbot (`chatbot.html`) served through **Nginx**, which communicates with the vLLM API.
+
+---
+
+## 🧩 Run the vLLM Inference Server (Locally)
 
 ### 1. Create and Activate a Conda Environment
 
@@ -24,66 +52,24 @@ sudo apt install nginx -y
 
 ---
 
-## 📁 Project Structure
+### 📁 Project Structure
 
 ```
 vllm-deployment/
 ├── chatbot.html                     # Frontend chatbot UI
-├── start_vllm_inference.sh          # (optional) Script to start the vLLM server
 ├── nginx.conf                       # Nginx configuration for chatbot frontend
 └── README.md
 ```
 
----
 
-## 📦 Model Download
-
-Download the desired **Llama 3.2** model using Hugging Face CLI:
-
-```bash
-huggingface-cli download meta-llama/Llama-3.2-3B-Instruct \
-  --local-dir Llama-3.2-3B-Instruct
-```
-
-For a smaller model (e.g., 1B):
-
-```bash
-huggingface-cli download meta-llama/Llama-3.2-1B \
-  --local-dir Llama-3.2-1B
-```
-
----
-
-## 🚀 Components Overview
-
-1. **vLLM Inference Server**
-   An OpenAI-compatible API server powered by `vLLM`, optimized for efficient inference.
-
-2. **Frontend Chatbot**
-   A lightweight HTML-based chatbot (`chatbot.html`) served through **Nginx**, which communicates with the vLLM API.
-
----
-
-## 🧩 Run the vLLM Inference Server
-
-Start the inference server:
+### Start the inference server:
 
 ```bash
 python -m vllm.entrypoints.openai.api_server \
-
     --model modles/3.1-8b-instruct \
     --max-num-batched-tokens 4096 \
     --gpu-memory-utilization 0.9 \
     --max-model-len 40960 
-```
-
-Start the inference server with **small model**:
-
-```bash
-python -m vllm.entrypoints.openai.api_server \
-  --model ./models/Llama-3.2-1B \
-  --max-num-batched-tokens 4096 \
-  --gpu-memory-utilization 0.5
 ```
 
 The API will be available at:
@@ -96,27 +82,32 @@ http://127.0.0.1:8000/v1
 
 ---
 
+## 🚀 Deployment Methods
 
-## 3. Run vLLM with Docker Compose 🧠
+You can deploy the **vLLM OpenAI-compatible API server** using one of the following methods based on your environment.
 
-Use the following command to launch the **vLLM OpenAI-compatible API server** with Docker Compose.
+-  Docker Compose (Quick)
+-  Plain Docker Command (For Testing)
+-  Kubernetes (Complex but resilient and Production Grade)
+
+---
+
+### 🧩 Option 1: Run vLLM with Docker Compose
+
+Use the following command to start the vLLM API server using **Docker Compose** for a simplified, multi-container setup.
 
 ```bash
 sudo docker compose up
 ```
 
-[See Details about dockerization guide](docs/dockerize.md)
+📘 For a detailed dockerization workflow and environment configuration, see:
+[**Dockerization Guide → docs/dockerize.md**](docs/dockerize.md)
 
 ---
 
+### 🐳 Option 2: Run vLLM with Docker Command
 
-## 3. Run vLLM with Docker Command 🧠
-
-Use the following command to launch the **vLLM OpenAI-compatible API server** inside Docker.
-
-* The Docker image **`vllm/vllm-openai:v0.8.0`** supports **CUDA 12.4**.
-* To use the latest CUDA version, switch to **`vllm/vllm-openai:latest`**.
-* Adjust **`--max-model-len`** based on your GPU’s available memory capacity.
+Use the following command to launch the **vLLM OpenAI-compatible API server** directly with `docker run`.
 
 
 ```bash
@@ -131,7 +122,49 @@ sudo docker run --gpus all \
   --max-model-len 8192
 ```
 
-[See Details about dockerization guide](docs/dockerize.md)
+**Note:**
+- The image `vllm/vllm-openai:v0.8.0` supports **CUDA 12.4**.
+- To use the latest CUDA version, switch to `vllm/vllm-openai:latest`.
+- Adjust `--max-model-len` according to your GPU’s available memory.
+
+
+📘 For a detailed dockerization workflow and environment configuration, see:
+[**Dockerization Guide → docs/dockerize.md**](docs/dockerize.md)
+
+---
+
+### ☸️ Kubernetes Cluster
+
+🤖 [**Kubernetes Deployment Guide**](kubeadm-cluster/README.md)
+
+---
+
+### ☸️ Option 3: Deploy vLLM on Kubernetes
+
+For **production-grade** or **scalable environments**, vLLM can be deployed as a **Kubernetes workload** using **YAML manifests**, **Helm charts**, or **Kustomize**.
+
+> This deployment integrates seamlessly with the previously configured **Kubernetes High Availability (HA) Cluster Architecture**, ensuring **redundancy**, **resilience**, and **efficient resource utilization**.
+
+#### 🧩 Apply Kubernetes manifests (recommended order):
+
+```bash
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
+kubectl apply -f k8s/ingress.yaml
+```
+
+#### ⚙️ Apply all manifests at once:
+
+```bash
+kubectl apply -f k8s/
+```
+
+> 💡 **Tip:**
+>
+> * Kubernetes applies YAML files **idempotently**, meaning reapplying them updates only changed resources.
+> * However, when deploying from scratch, applying in **logical order** (namespace → config → deployment → service → ingress) ensures dependencies are created correctly.
 
 ---
 
@@ -156,38 +189,38 @@ You can also use the **OpenAI Python client** by setting your `base_url` to `htt
 
 ## 🌐 Serve the Chatbot via Nginx
 
-1. Copy your Nginx configuration file:
+Copy your Nginx configuration file:
 
-   ```bash
-   sudo cp nginx.conf /etc/nginx/sites-available/chatbot
-   ```
+```bash
+sudo cp nginx.conf /etc/nginx/sites-available/chatbot
+```
 
-2. Enable and start Nginx (One time after installation):
+Enable and start Nginx (One time after installation):
 
-   ```bash
-   sudo ln -s /etc/nginx/sites-available/chatbot /etc/nginx/sites-enabled/
-   sudo systemctl enable nginx
-   sudo systemctl start nginx
-   ```
+```bash
+sudo ln -s /etc/nginx/sites-available/chatbot /etc/nginx/sites-enabled/
+sudo systemctl enable nginx
+sudo systemctl start nginx
+```
 
-2. Test configuration and restart Nginx:
+Test configuration and restart Nginx:
 
-   ```bash
-   sudo nginx -t
-   sudo systemctl restart nginx
-   ```
+```bash
+sudo nginx -t
+sudo systemctl restart nginx
+```
 
-3. Open the chatbot in your browser:
+Open the chatbot in your browser:
 
-   ```
-   http://localhost
-   ```
+```
+http://localhost
+```
 
-   or (replace with your system’s IP):
+or (replace with your system’s IP):
 
-   ```
-   http://192.168.1.1
-   ```
+```
+http://192.168.1.1
+```
 
 ---
 
@@ -199,27 +232,3 @@ You can also use the **OpenAI Python client** by setting your `base_url` to `htt
 
 ---
 
-## 🧾 Notes & Tips
-
-* Ensure `chatbot.html` points to the correct backend endpoint:
-
-  ```
-  http://localhost:8000/v1/chat/completions
-  ```
-* Adjust model paths and inference parameters as needed.
-* For distributed testing:
-
-  ```bash
-  python3 distributed_load_test.py --node-id 1 --users 12
-  ```
-* Old setup reference:
-
-  ```bash
-  python -m vllm.entrypoints.openai.api_server \
-    --model /mnt/data/office_work/vllms_inference/llama3_8b \
-    --max-num-batched-tokens 4096 \
-    --gpu-memory-utilization 0.9
-  python3 -m http.server 8080
-  ```
-
----
