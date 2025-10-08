@@ -8,7 +8,7 @@ localAPIEndpoint:
   advertiseAddress: "192.168.1.1"
   bindPort: 6443
 nodeRegistration:
-  name: "control-plane-1"
+  name: "pc1"
   criSocket: "unix:///var/run/containerd/containerd.sock"
   # Ensure the path matches your container runtime socket.
 
