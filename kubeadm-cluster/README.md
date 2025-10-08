@@ -316,7 +316,7 @@ kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documen
 Check that all CNI-related pods (Calico or Flannel) are running successfully:
 
 ```bash
-kubectl get pods -n kube-system
+kubectl get pods -n kube-flannel -o wide
 ```
 
 Wait until all pods report a `Running` status before proceeding to join other control planes or worker nodes.

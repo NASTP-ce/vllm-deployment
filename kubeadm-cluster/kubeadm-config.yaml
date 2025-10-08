@@ -1,37 +1,34 @@
-# Kubeadm configuration for a highly available cluster with hybrid control plane nodes.
-# This file is used to initialize the first control plane node (192.168.1.1).
+# Kubeadm HA configuration for first control-plane node (pc1)
+# This includes API server and etcd certificates SANs for pc3 and pc5
 
 apiVersion: kubeadm.k8s.io/v1beta3
 kind: InitConfiguration
 localAPIEndpoint:
-  # IP address of the node where 'kubeadm init' is executed.
-  advertiseAddress: "192.168.1.1"
+  advertiseAddress: "192.168.1.1"   # IP of this control-plane node (pc1)
   bindPort: 6443
 nodeRegistration:
   name: "pc1"
   criSocket: "unix:///var/run/containerd/containerd.sock"
-  # Ensure the path matches your container runtime socket.
+  taints:
+    - key: "node-role.kubernetes.io/control-plane"
+      effect: "NoSchedule"
 
 ---
-
 apiVersion: kubeadm.k8s.io/v1beta3
 kind: ClusterConfiguration
-# Stable Kubernetes version
 kubernetesVersion: "v1.30.5"
-
-# Cluster name
 clusterName: "gpt-cluster"
 
-# The controlPlaneEndpoint is your load balancer's VIP
+# HA control plane endpoint (VIP of HAProxy + Keepalived)
 controlPlaneEndpoint: "192.168.1.100:6443"
 
+# API server certificates: include VIP + all control-plane IPs
 apiServer:
   certSANs:
-    # Include VIP + all control-plane IPs to avoid TLS errors
-    - "192.168.1.100"   # VIP (HAProxy + Keepalived)
-    - "192.168.1.1"     # Control Plane 1
-    - "192.168.1.3"     # Control Plane 2
-    - "192.168.1.5"     # Control Plane 3
+    - "192.168.1.100"   # VIP (HAProxy)
+    - "192.168.1.1"     # pc1
+    - "192.168.1.3"     # pc3
+    - "192.168.1.5"     # pc5
     - "192.168.1.9"     # HAProxy 1
     - "192.168.1.10"    # HAProxy 2
   timeoutForControlPlane: 4m0s
@@ -39,14 +36,34 @@ apiServer:
 controllerManager: {}
 scheduler: {}
 
-# Networking — ensure this matches your chosen CNI (Flannel default)
+# Networking configuration for Flannel CNI
 networking:
   podSubnet: "10.244.0.0/16"
   serviceSubnet: "10.96.0.0/12"
 
----
+# etcd configuration: include all control-plane nodes for peer/server certs
+etcd:
+  local:
+    serverCertSANs:
+      - "pc1"
+      - "pc3"
+      - "pc5"
+      - "192.168.1.1"
+      - "192.168.1.3"
+      - "192.168.1.5"
+      - "localhost"
+      - "127.0.0.1"
+    peerCertSANs:
+      - "pc1"
+      - "pc3"
+      - "pc5"
+      - "192.168.1.1"
+      - "192.168.1.3"
+      - "192.168.1.5"
+      - "localhost"
+      - "127.0.0.1"
 
-# Ensure kubelet's cgroup driver matches container runtime.
+---
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 cgroupDriver: "systemd"
