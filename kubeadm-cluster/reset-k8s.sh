@@ -29,6 +29,13 @@ sudo rm -rf /var/lib/cni/
 sudo rm -rf /var/run/kubernetes
 sudo rm -rf ~/.kube
 
+echo "[3] Kill leftover control-plane processes..."
+# kube-apiserver, kube-controller-manager, kube-scheduler may still be running
+pkill -9 kube-apiserver || true
+pkill -9 kube-controller-manager || true
+pkill -9 kube-scheduler || true
+pkill -9 etcd || true
+
 # 4️⃣ Clean up networking (Flannel, Calico, etc.)
 echo "🌐 Cleaning up CNI network interfaces..."
 sudo ip link delete cni0 2>/dev/null || true

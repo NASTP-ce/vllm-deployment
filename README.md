@@ -189,26 +189,80 @@ You can also use the **OpenAI Python client** by setting your `base_url` to `htt
 
 ## 🌐 Serve the Chatbot via Nginx
 
-Copy your Nginx configuration file:
+### 🧱 1. Copy the Frontend Website
 
 ```bash
-sudo cp nginx.conf /etc/nginx/sites-available/chatbot
+# Create a standard web root directory
+sudo mkdir -p /var/www/chatbot
+
+# Copy the built frontend files
+sudo cp chatbot.html /var/www/chatbot/
+
+# Set proper ownership and permissions for Nginx
+sudo chown -R www-data:www-data /var/www/chatbot
+sudo chmod -R 755 /var/www/chatbot
 ```
 
-Enable and start Nginx (One time after installation):
+**📘 Explanation:**
+
+* `/var/www/chatbot` → standard and secure directory for serving web content.
+* `www-data` → default Nginx user on Ubuntu/Debian systems.
+* `755` permissions → readable by everyone, writable only by owner.
+
+---
+
+### ⚙️ 2. Copy Nginx Configuration Files to System Locations
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/chatbot /etc/nginx/sites-enabled/
+# Create the upstreams directory
+# (Recommended for modular configs and active health checks)
+sudo mkdir -p /etc/nginx/upstreams
+
+# Copy the backend upstream configuration
+sudo cp nginx/vllm_backends.conf /etc/nginx/upstreams/vllm_backends.conf
+
+# Copy the main site configuration
+sudo cp nginx/nginx.conf /etc/nginx/sites-available/chatbot.conf
+```
+
+**📘 Explanation:**
+
+* `/etc/nginx/upstreams/` → keeps backend definitions separate and organized.
+* `/etc/nginx/sites-available/` → stores configuration files for all sites.
+* `/etc/nginx/sites-enabled/` → holds symbolic links to active sites.
+
+---
+
+### 2. 🔗 Enable the Site
+
+```bash
+sudo ln -s /etc/nginx/sites-available/chatbot.conf /etc/nginx/sites-enabled/
+```
+
+*(If a file with the same name exists, remove it first: `sudo rm /etc/nginx/sites-enabled/chatbot.conf`)*
+
+---
+
+### 3. ⚙️ Test and Apply Configuration
+
+```bash
+# Test syntax
+sudo nginx -t
+
+# Apply configuration safely (no downtime)
+sudo systemctl reload nginx
+```
+
+If Nginx is not running yet:
+
+```bash
 sudo systemctl enable nginx
 sudo systemctl start nginx
 ```
 
-Test configuration and restart Nginx:
+---
 
-```bash
-sudo nginx -t
-sudo systemctl restart nginx
-```
+**(Optional) Nginx Dynamic Health Check:** See the [Dynamci Healthcheck by script](docs/nginx_dynamic_upstreams.md)
 
 Open the chatbot in your browser:
 

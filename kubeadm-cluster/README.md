@@ -245,7 +245,7 @@ sudo crictl --runtime-endpoint unix:///var/run/containerd/containerd.sock versio
 On the **primary control plane node** (`192.168.1.1`), initialize the cluster using the declarative configuration file:
 
 ```bash
-sudo kubeadm init --config=kubeadm-config.yaml
+sudo kubeadm init --config=kubeadm-config.yaml --upload-certs
 ```
 
 ---
@@ -342,14 +342,11 @@ kubeadm join 192.168.1.100:6443 --token <token> \
   --control-plane
 ```
 
-> 🧠 **Tip (Memorization Trick):**
-> Remember “**Join–Token–Hash–Control**” → the 4 ingredients for every HA control-plane join.
-
 ---
 
-### 🖥️ Run the Join Command on Each Additional Control Plane Node
+### 🖥️ Join Additional Control Plane Nodes
 
-On nodes `192.168.1.3` and `192.168.1.5`, execute the generated join command:
+On the control plane nodes **`192.168.1.3` (pc3)** and **`192.168.1.5` (pc5)**, run the following command to join them to the existing cluster:
 
 ```bash
 sudo kubeadm join 192.168.1.100:6443 --token <token> \
@@ -357,7 +354,15 @@ sudo kubeadm join 192.168.1.100:6443 --token <token> \
   --control-plane
 ```
 
-> Replace `192.168.1.100` with your **HAProxy VIP** or API load balancer address.
+Or, if you are using a pre-defined join configuration file (for example, `kubeadm-config-join-pc3.yaml`), use:
+
+```bash
+sudo kubeadm join --config=kubeadm-config-join-pc3.yaml \
+  --certificate-key c3f33441c7ac67d7e55ecdf5b18b5eaa1cb963f46dba2c73635a2d556ce6cf8e \
+  --control-plane
+```
+
+> 💡 **Note:** Replace `192.168.1.100` with your **HAProxy Virtual IP (VIP)** or API load balancer address.
 
 ---
 
