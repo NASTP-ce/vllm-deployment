@@ -1,0 +1,12 @@
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: JoinConfiguration
+discovery:
+  bootstrapToken:
+    token: <your-token> # <-- Replace with actual token from `kubeadm token create`
+    apiServerEndpoint: "192.168.1.100:6443"
+    caCertHashes:
+      - sha256:<your-ca-hash> # <-- Replace with actual hash from first control plane
+nodeRegistration:
+  name: <your-node-name> # <-- Replace with dns name of this worker node (eg pc2)
+  kubeletExtraArgs:
+    node-ip: 192.168.1.4 # <-- Replace with IP of this worker node (eg pc2)

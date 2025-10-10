@@ -1,0 +1,19 @@
+# Kubeadm HA join configuration for second control-plane node (pc3)
+
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: JoinConfiguration
+discovery:
+  bootstrapToken:
+    token: "abcdef.0123456789abcdef"      # <-- Replace with actual token from `kubeadm token create`
+    apiServerEndpoint: "192.168.1.100:6443"   # VIP for HAProxy + Keepalived
+    caCertHashes:
+      - "sha256:YOUR_HASH_HERE"           # <-- Replace with actual hash from first control plane
+controlPlane:
+  localAPIEndpoint:
+    advertiseAddress: "192.168.1.3"       # IP of this control-plane node
+    bindPort: 6443
+nodeRegistration:
+  name: "pc3"
+  criSocket: "unix:///var/run/containerd/containerd.sock"
+  kubeletExtraArgs:
+    node-ip: "192.168.1.3"
